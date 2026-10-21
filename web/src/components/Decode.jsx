@@ -81,7 +81,7 @@ export default function Decode({ announce }) {
           )}
           <div className="card">
             <h3>Claims</h3>
-            <div className="table-wrap">
+            <div className="table-wrap" tabIndex={0} role="region" aria-label="Claims table (scrollable)">
               <table>
                 <caption className="sr-only">Header and payload claims with a plain-English explanation</caption>
                 <thead><tr><th scope="col">Claim</th><th scope="col">Value</th><th scope="col">In plain English</th></tr></thead>

@@ -35,7 +35,7 @@ export default function App() {
         <span className="mode mode--demo" data-testid="mode-badge">DEMO<span className="sr-only">: stub servers on loopback, nothing real is contacted</span></span>
         <nav aria-label="Tools">
           {TABS.map(([id, label]) => (
-            <button key={id} type="button" className="tab" aria-pressed={tab === id} onClick={() => setTab(id)}>{label}</button>
+            <button key={id} type="button" className="tab" aria-pressed={tab === id} onClick={() => { setTab(id); setMessage(""); }}>{label}</button>
           ))}
         </nav>
         <button type="button" className="btn" onClick={() => setTheme(dark ? "light" : "dark")} aria-label={`Switch to ${dark ? "light" : "dark"} theme`}>{dark ? "Light" : "Dark"}</button>

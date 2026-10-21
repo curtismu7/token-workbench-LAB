@@ -35,7 +35,7 @@ export const META = { profiles: [{ id: "good", title: "Good profile", blurb: "Ev
 export const CHECK = {
   target: "http://127.0.0.1:5914", metadata: { found: true },
   packs: {
-    bcp: { title: "RFC 9700 BCP", unverified: false, rules: [{ id: "pkce-required", title: "PKCE is required", rfc: "RFC 7636", why: "Because.", status: "fail", evidence: "issued a code with no challenge" }, { id: "metadata", title: "Metadata", rfc: "RFC 8414", why: "w", status: "pass", evidence: "found" }] },
+    bcp: { title: "RFC 9700 BCP", unverified: false, note: "Rules are this demo's paraphrase of RFC 9700. Only RFC numbers are cited, not section numbers.", rules: [{ id: "pkce-required", title: "PKCE is required", rfc: "RFC 7636", why: "Because.", status: "fail", evidence: "issued a code with no challenge" }, { id: "metadata", title: "Metadata", rfc: "RFC 8414", why: "w", status: "pass", evidence: "found" }] },
     fapi: { title: "FAPI 2.0 (simplified)", unverified: true, note: "UNVERIFIED: this FAPI 2.0 pack is a simplified reading.", rules: [{ id: "fapi-par-published", title: "PAR is published", rfc: "RFC 9126", why: "w", status: "fail", evidence: "no endpoint" }] },
   },
 };

@@ -35,7 +35,7 @@ export default function Tester({ announce }) {
         {summary && <span className="summary" data-testid="tester-summary"><Badge kind={summary.failed ? "deny" : "ok"}>{summary.passed} of {summary.total} correct</Badge></span>}
       </div>
       {error && <p className="alert" role="alert">{error}</p>}
-      <div className="table-wrap card">
+      <div className="table-wrap card" tabIndex={0} role="region" aria-label="Wrong-token cases (scrollable)">
         <table>
           <caption className="sr-only">Wrong-token cases: expected answer, actual answer and result</caption>
           <thead><tr><th scope="col">Case</th><th scope="col">Expected</th><th scope="col">Actual</th><th scope="col">Result</th><th scope="col"><span className="sr-only">Actions</span></th></tr></thead>

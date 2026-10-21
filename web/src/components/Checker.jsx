@@ -14,7 +14,8 @@ function Pack({ id, pack }) {
         <span className="muted small">{counts.pass || 0} pass, {counts.fail || 0} fail{counts.error ? `, ${counts.error} error` : ""}</span>
       </div>
       {pack.unverified && <p className="callout-text" data-testid="fapi-note">{pack.note}</p>}
-      <div className="table-wrap">
+      {!pack.unverified && pack.note && <p className="muted small" data-testid="bcp-note">{pack.note}</p>}
+      <div className="table-wrap" tabIndex={0} role="region" aria-label={`${pack.title} results (scrollable)`}>
         <table>
           <caption className="sr-only">{pack.title}: result per rule with the evidence</caption>
           <thead><tr><th scope="col">Rule</th><th scope="col">Result</th><th scope="col">Evidence</th></tr></thead>
@@ -49,8 +50,8 @@ export default function Checker({ announce }) {
     try {
       const d = await postCheckerRun({ ...(choice === "url" ? { target: url.trim() } : { profile: choice }), pack });
       setRes(d);
-      const all = Object.values(d.packs).flatMap((p) => p.rules);
-      announce(`Profile checker: ${all.filter((r) => r.status === "pass").length} rules passed, ${all.filter((r) => r.status === "fail").length} failed.`);
+      const part = ([id, p]) => `${id === "fapi" ? "FAPI 2.0 pack (UNVERIFIED)" : "RFC 9700 pack"}: ${p.rules.filter((r) => r.status === "pass").length} passed, ${p.rules.filter((r) => r.status === "fail").length} failed`;
+      announce(`Profile checker. ${Object.entries(d.packs).map(part).join(". ")}.`);
     } catch (e) { setRes(null); setError(e.status === 429 ? "Another run is in progress. Try again in a moment." : e.message); announce(""); } finally { setBusy(false); }
   };
 
@@ -83,7 +84,7 @@ export default function Checker({ announce }) {
       {error && <p className="alert" role="alert">{error}</p>}
       {res && (
         <div data-testid="checker-result">
-          <p className="muted small">Target {res.target}. Metadata {res.metadata?.found ? "found" : "not found; default endpoints were used"}.</p>
+          <p className="muted small">Target {res.target}. {res.unreachable ? "The target did not answer, so no rule was judged." : `Metadata ${res.metadata?.found ? "found" : "not found; default endpoints were used"}.`}</p>
           {res.packs.bcp && <Pack id="bcp" pack={res.packs.bcp} />}
           {res.packs.fapi && <Pack id="fapi" pack={res.packs.fapi} />}
         </div>

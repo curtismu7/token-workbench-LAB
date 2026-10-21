@@ -52,11 +52,11 @@ const edgeTypes = { step: StepEdge };
 const OUTCOME = { attack_succeeds: ["deny", "ATTACK SUCCEEDS"], attack_blocked: ["ok", "ATTACK BLOCKED"] };
 
 function Side({ title, run, kind }) {
-  if (!run) return <div className="card side"><h4>{title}</h4><p className="muted">Loading</p></div>;
+  if (!run) return <div className="card side"><h3>{title}</h3><p className="muted">Loading</p></div>;
   const [k, word] = OUTCOME[run.attack.outcome];
   return (
     <div className="card side" data-testid={`side-${kind}`}>
-      <h4>{title}</h4>
+      <h3>{title}</h3>
       <ol className="steps">{run.steps.map((s) => <li key={s.n} className={s.evil ? "evil" : ""}><span className="who">{ACTORS[s.from]} to {ACTORS[s.to]}</span> {s.label}{s.evil && <> <Badge kind="deny">attacker</Badge></>}</li>)}</ol>
       <p><Badge kind={k}>{word}</Badge> {run.attack.reason}</p>
     </div>
@@ -92,7 +92,7 @@ export default function Flows({ theme, announce }) {
     return () => clearTimeout(t);
   }, [running, step, steps.length, speed]);
 
-  const simulate = () => { if (!cur) return; setStep(0); setRunning(true); announce(`Simulating ${cur.mechanism.name} ${prot ? "with" : "without"} protection.`); };
+  const simulate = () => { if (!cur || running) return; setStep(0); setRunning(true); announce(`Simulating ${cur.mechanism.name} ${prot ? "with" : "without"} protection.`); };
   const reset = () => { setRunning(false); setStep(-1); setMoved(START); announce("Diagram reset."); };
   const onNodesChange = useCallback((c) => setMoved((n) => applyNodeChanges(c, n)), []);
 
@@ -100,7 +100,7 @@ export default function Flows({ theme, announce }) {
   const now = step >= 0 && step < steps.length ? steps[step] : null;
   const nodes = useMemo(() => moved.map((n) => {
     const active = now && (now.from === n.id || now.to === n.id);
-    return { ...n, data: { ...n.data, on: !!active, dim: !!now && !active, evil: n.id === "attacker", tag: done && cur && n.id === "attacker" ? (cur.attack.outcome === "attack_blocked" ? "blocked" : "succeeded") : undefined } };
+    return { ...n, ariaLabel: n.data.title, data: { ...n.data, on: !!active, dim: !!now && !active, evil: n.id === "attacker", tag: done && cur && n.id === "attacker" ? (cur.attack.outcome === "attack_blocked" ? "blocked" : "succeeded") : undefined } };
   }), [moved, now, done, cur]);
   const edges = useMemo(() => steps.filter((s) => s.from !== s.to).map((s) => ({
     id: `s${s.n}`, source: s.from, target: s.to, type: "step", sourceHandle: "s", targetHandle: "t",
@@ -125,10 +125,11 @@ export default function Flows({ theme, announce }) {
         <label>Speed{" "}
           <select value={speed} onChange={(e) => setSpeed(e.target.value)}>{SPEEDS.map(([v, t]) => <option key={v} value={v}>{t}</option>)}</select>
         </label>
-        <button type="button" className="btn primary" onClick={simulate} disabled={running || !cur}>Simulate</button>
+        <button type="button" className="btn primary" onClick={simulate} aria-disabled={running || !cur}>Simulate</button>
         <button type="button" className="btn" onClick={reset}>Reset</button>
         <span className="muted small">Drag any box.</span>
       </div>
+      <div className="flow-scroll" tabIndex={0} role="region" aria-label="Diagram area (scrollable on narrow screens)">
       <div className="flow-wrap" role="group" aria-label={`${cur?.mechanism.name ?? ""} flow diagram between client, browser, authorization server, resource server and attacker. Boxes can be dragged. The steps are listed below.`}>
         <ReactFlow nodes={nodes} edges={edges} nodeTypes={nodeTypes} edgeTypes={edgeTypes} onNodesChange={onNodesChange} colorMode={theme}
           fitView fitViewOptions={{ padding: 0.1 }} nodesConnectable={false} proOptions={{ hideAttribution: true }} minZoom={0.2}>
@@ -136,13 +137,14 @@ export default function Flows({ theme, announce }) {
           <Controls showInteractive={false} />
         </ReactFlow>
       </div>
+      </div>
       <p className="caption" role="status" aria-live="polite" data-testid="caption">{caption}</p>
       <div className="sides">
         <Side title="Without protection" run={runs.off} kind="off" />
         <Side title={`With ${cur?.mechanism.name ?? "protection"}`} run={runs.on} kind="on" />
       </div>
       {compare && (
-        <div className="card table-wrap">
+        <div className="card table-wrap" tabIndex={0} role="region" aria-label="Mechanism comparison (scrollable)">
           <table data-testid="compare">
             <caption className="sr-only">Each mechanism with and without protection</caption>
             <thead><tr><th scope="col">Mechanism</th><th scope="col">Attack it stops</th><th scope="col">Without</th><th scope="col">With</th></tr></thead>
