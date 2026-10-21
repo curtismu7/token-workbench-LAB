@@ -12,7 +12,7 @@ import { assertBindAllowed, bindHost, credentialGuard, hostGuard, originGuard, s
 import { explainClaims, parseJwt, timeStatus, verifyEs256, MAX_TOKEN_CHARS } from './jwt.js';
 import { inertValue, revealText } from './sanitize.js';
 import { caseList, runAll, runCase } from './tester.js';
-import { BCP_RULES, FAPI_RULES, FAPI_NOTE, runChecker } from './checker.js';
+import { BCP_RULES, BCP_NOTE, FAPI_RULES, FAPI_NOTE, runChecker } from './checker.js';
 import { PROFILES, PROFILE_ORDER } from './stubs/authserver.js';
 import { compare, listMechanisms, runFlow } from './catalog.js';
 import { TargetRefused } from './http.js';
@@ -67,14 +67,14 @@ export function createApp({ runtime, health = createHealth(), webDist = DEFAULT_
     mode: runtime.mode, issuer: runtime.ids.issuer, resource: runtime.ids.resource, jwksUrl: runtime.rs.jwksUrl,
     allowedAlgs: ALLOWED_ALGS, maxTokenChars: MAX_TOKEN_CHARS, ports: runtime.ports,
     profiles: PROFILE_ORDER.map((id) => ({ id, title: PROFILES[id].title, blurb: PROFILES[id].blurb, url: runtime.authServers[id].url })),
-    rules: { bcp: BCP_RULES.map(({ id, title, rfc }) => ({ id, title, rfc })), fapi: FAPI_RULES.map(({ id, title, rfc }) => ({ id, title, rfc })), fapiNote: FAPI_NOTE },
+    rules: { bcp: BCP_RULES.map(({ id, title, rfc }) => ({ id, title, rfc })), fapi: FAPI_RULES.map(({ id, title, rfc }) => ({ id, title, rfc })), fapiNote: FAPI_NOTE, bcpNote: BCP_NOTE },
   }));
   api.get('/jwks', (_req, res) => res.json(runtime.keyring.jwks()));
 
   // --- decode / mint ---
   api.post('/mint', wrap((req, res) => {
     const b = takeBody(req, res, ['sample']); if (!b) return;
-    const s = SAMPLES[b.sample];
+    const s = typeof b.sample === 'string' && Object.hasOwn(SAMPLES, b.sample) ? SAMPLES[b.sample] : null;
     if (!s) return bad(res, `sample must be one of: ${Object.keys(SAMPLES).join(', ')}`);
     const t = Math.floor(runtime.now());
     // Raw token on purpose: this is a debugging tool. It is signed by a stub key that exists only in this process.
@@ -116,7 +116,7 @@ export function createApp({ runtime, health = createHealth(), webDist = DEFAULT_
     if (!['bcp', 'fapi', 'both'].includes(pack)) return bad(res, 'pack must be bcp, fapi or both');
     let target;
     if (b.profile !== undefined) {
-      if (typeof b.profile !== 'string' || !runtime.authServers[b.profile]) return bad(res, `profile must be one of: ${PROFILE_ORDER.join(', ')}`);
+      if (typeof b.profile !== 'string' || !Object.hasOwn(runtime.authServers, b.profile)) return bad(res, `profile must be one of: ${PROFILE_ORDER.join(', ')}`);
       target = runtime.authServers[b.profile].url;
     } else {
       if (typeof b.target !== 'string' || b.target.length > 200) return bad(res, 'target must be a URL string of at most 200 characters');
@@ -166,7 +166,7 @@ export async function startHttpServer({ port = serverPort(), host = bindHost(), 
     httpServer.once('listening', () => {
       const { port: bound } = httpServer.address();
       resolve({
-        port: bound, runtime: rt, url: `http://127.0.0.1:${bound}/`,
+        port: bound, host: httpServer.address().address, runtime: rt, url: `http://127.0.0.1:${bound}/`,
         close: async () => { health.stop(); await new Promise((r) => { httpServer.closeAllConnections?.(); httpServer.close(r); }); await rt.close(); },
       });
     });

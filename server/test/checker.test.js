@@ -119,6 +119,7 @@ test('an unreachable loopback target yields error results, not a crash', async (
   const port = await freeBase('checker', 1);
   const r = await app.post('/api/checker/run', { target: `http://127.0.0.1:${port}` });
   assert.equal(r.status, 200);
-  assert.ok(r.json.packs.bcp.rules.every((x) => x.status === 'error' || x.status === 'fail'));
-  assert.equal(r.json.packs.bcp.summary.passed <= 1, true);
+  assert.equal(r.json.unreachable, true);
+  for (const pack of ['bcp', 'fapi']) assert.ok(r.json.packs[pack].rules.every((x) => x.status === 'error'), `${pack}: nothing answered, so no rule may be judged pass or fail`);
+  assert.equal(r.json.requests, 2, 'only the two discovery requests were made');
 });

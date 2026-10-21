@@ -10,13 +10,13 @@ import { CLIENT_ID, REGISTERED_REDIRECT } from './stubs/authserver.js';
 
 export const BCP_RULES = [
   { id: 'metadata', title: 'Authorization-server metadata is published', rfc: 'RFC 8414', why: 'Clients and tools find endpoints and capabilities from metadata. Without it they hard-code guesses, and capability checks (PKCE methods, iss support) cannot be made.' },
-  { id: 'exact-redirect', title: 'Redirect URIs match exactly', rfc: 'RFC 9700 2.1', why: 'Prefix or pattern matching lets an attacker who controls any path or query under the registered URI receive the authorization code.' },
-  { id: 'pkce-required', title: 'PKCE is required', rfc: 'RFC 9700 2.1.1, RFC 7636', why: 'A stolen authorization code is useless without the verifier, but only if the server refuses requests that skip PKCE.' },
-  { id: 'pkce-downgrade', title: 'PKCE downgrade is rejected at the token endpoint', rfc: 'RFC 9700 2.1.1', why: 'If a code issued with a challenge can be redeemed without the verifier (or with a wrong one), PKCE protects nothing.' },
-  { id: 's256-only', title: 'Only S256 is accepted', rfc: 'RFC 9700 2.1.1', why: 'The "plain" method sends the verifier itself as the challenge, so anyone who sees the request can redeem the code.' },
-  { id: 'no-ropc', title: 'Password (ROPC) grant is off', rfc: 'RFC 9700 2.4', why: 'The password grant hands the user\'s credentials to the client and bypasses MFA and consent.' },
-  { id: 'no-implicit', title: 'Implicit (response_type=token) is off', rfc: 'RFC 9700 2.1.2', why: 'Implicit puts the access token in the URL fragment, where history, referrers and scripts can reach it.' },
-  { id: 'single-use-code', title: 'Authorization codes are single-use', rfc: 'RFC 6749 4.1.2, RFC 9700 4.5', why: 'A code that can be redeemed twice turns any leak or replay into a second set of tokens.' },
+  { id: 'exact-redirect', title: 'Redirect URIs match exactly', rfc: 'RFC 9700', why: 'Prefix or pattern matching lets an attacker who controls any path or query under the registered URI receive the authorization code.' },
+  { id: 'pkce-required', title: 'PKCE is required', rfc: 'RFC 9700, RFC 7636', why: 'A stolen authorization code is useless without the verifier, but only if the server refuses requests that skip PKCE.' },
+  { id: 'pkce-downgrade', title: 'PKCE downgrade is rejected at the token endpoint', rfc: 'RFC 9700', why: 'If a code issued with a challenge can be redeemed without the verifier (or with a wrong one), PKCE protects nothing.' },
+  { id: 's256-only', title: 'Only S256 is accepted', rfc: 'RFC 9700', why: 'The "plain" method sends the verifier itself as the challenge, so anyone who sees the request can redeem the code.' },
+  { id: 'no-ropc', title: 'Password (ROPC) grant is off', rfc: 'RFC 9700', why: 'The password grant hands the user\'s credentials to the client and bypasses MFA and consent.' },
+  { id: 'no-implicit', title: 'Implicit (response_type=token) is off', rfc: 'RFC 9700', why: 'Implicit puts the access token in the URL fragment, where history, referrers and scripts can reach it.' },
+  { id: 'single-use-code', title: 'Authorization codes are single-use', rfc: 'RFC 6749, RFC 9700', why: 'A code that can be redeemed twice turns any leak or replay into a second set of tokens.' },
   { id: 'iss-param', title: 'iss is returned in the authorization response', rfc: 'RFC 9207', why: 'The iss parameter lets a client detect a response from the wrong authorization server (mix-up attacks).' },
 ];
 export const FAPI_RULES = [
@@ -28,6 +28,7 @@ export const FAPI_RULES = [
   { id: 'fapi-exact-redirect', title: 'Redirect URIs match exactly', rfc: 'FAPI 2.0, RFC 9700', why: 'As in the BCP pack.' },
   { id: 'fapi-iss', title: 'iss is returned in the authorization response', rfc: 'RFC 9207, FAPI 2.0', why: 'As in the BCP pack.' },
 ];
+export const BCP_NOTE = 'Rules are this demo\'s paraphrase of RFC 9700. Only RFC numbers are cited, not section numbers, because the sections were not checked against the RFC text.';
 export const FAPI_NOTE = 'UNVERIFIED: this FAPI 2.0 pack is a simplified reading of the profile written for this demo, not a conformance suite, and it has not been checked against the FAPI 2.0 text line by line. Do not use it to claim that any product is or is not FAPI 2.0 compliant.';
 
 const inert = (v, n = 200) => revealText(v, n);
@@ -45,14 +46,15 @@ export async function runChecker({ target, packs = ['bcp', 'fapi'] }) {
   const call = (url, opts) => { requests += 1; return loopbackRequest(url, opts); };
 
   // --- discovery ---
-  let meta = null; let metaUrl = null;
+  let meta = null; let metaUrl = null; let discoveryErrors = 0;
   for (const p of ['/.well-known/oauth-authorization-server', '/.well-known/openid-configuration']) {
     try {
       const r = await call(`${origin}${p}`);
       const j = r.status === 200 ? parseJson(r.text) : null;
       if (j && typeof j === 'object' && !Array.isArray(j)) { meta = j; metaUrl = `${origin}${p}`; break; }
-    } catch (e) { if (e instanceof TargetRefused) throw e; }
+    } catch (e) { if (e instanceof TargetRefused) throw e; discoveryErrors += 1; }
   }
+  const discoveryFailed = discoveryErrors === 2;
   const str = (v) => (typeof v === 'string' ? v : null);
   const authzEp = str(meta?.authorization_endpoint) || `${origin}/authorize`;
   const tokenEp = str(meta?.token_endpoint) || `${origin}/token`;
@@ -204,6 +206,8 @@ export async function runChecker({ target, packs = ['bcp', 'fapi'] }) {
   };
 
   async function evaluate(rule) {
+    // Nothing answered at all: say so, instead of judging metadata-derived rules against metadata that could not be fetched.
+    if (discoveryFailed) return { id: rule.id, title: rule.title, rfc: rule.rfc, why: rule.why, status: 'error', evidence: 'the target did not answer (no connection), so this rule cannot be judged' };
     try { return { id: rule.id, title: rule.title, rfc: rule.rfc, why: rule.why, ...await probes[rule.id]() }; }
     catch (e) {
       const ev = e instanceof TargetRefused ? `refused to contact ${e.reason === 'not_loopback' ? 'a non-loopback endpoint named in the metadata' : 'that endpoint'}: ${e.message}` : `request failed (${inert(e.code || 'error', 40)})`;
@@ -215,8 +219,8 @@ export async function runChecker({ target, packs = ['bcp', 'fapi'] }) {
     return { total: rules.length, passed: count('pass'), failed: count('fail'), errors: count('error') };
   };
 
-  const out = { target: origin, metadata: { found: Boolean(meta), url: metaUrl ? metaUrl.replace(origin, '') : null }, packs: {} };
-  if (packs.includes('bcp')) { const rules = []; for (const r of BCP_RULES) rules.push(await evaluate(r)); out.packs.bcp = { title: 'OAuth 2.0 Security BCP (RFC 9700)', unverified: false, rules, summary: summarise(rules) }; }
+  const out = { target: origin, unreachable: discoveryFailed, metadata: { found: Boolean(meta), url: metaUrl ? metaUrl.replace(origin, '') : null }, packs: {} };
+  if (packs.includes('bcp')) { const rules = []; for (const r of BCP_RULES) rules.push(await evaluate(r)); out.packs.bcp = { title: 'OAuth 2.0 Security BCP (RFC 9700)', unverified: false, note: BCP_NOTE, rules, summary: summarise(rules) }; }
   if (packs.includes('fapi')) { const rules = []; for (const r of FAPI_RULES) rules.push(await evaluate(r)); out.packs.fapi = { title: 'FAPI 2.0 (simplified)', unverified: true, note: FAPI_NOTE, rules, summary: summarise(rules) }; }
   out.requests = requests;
   return out;

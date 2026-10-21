@@ -131,7 +131,7 @@ export function startAuthServer({ port, profile }) {
     const server = app.listen(port, '127.0.0.1');
     server.once('error', reject);
     server.once('listening', () => resolve({
-      port, profile, url: origin, title: cfg.title, blurb: cfg.blurb,
+      port, host: server.address().address, profile, url: origin, title: cfg.title, blurb: cfg.blurb,
       close: () => new Promise((r) => { server.closeAllConnections?.(); server.close(r); }),
     }));
   });

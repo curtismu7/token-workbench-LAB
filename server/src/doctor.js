@@ -7,7 +7,9 @@ export function runChecks({ env = process.env } = {}) {
   const add = (id, level, detail) => checks.push({ id, level, detail });
 
   const major = Number(process.versions.node.split('.')[0]);
-  add('node', major >= 20 ? 'pass' : 'fail', `v${process.versions.node} (need >= 20)`);
+  const minor = Number(process.versions.node.split('.')[1]);
+  const nodeOk = major > 20 || (major === 20 && minor >= 12); // process.loadEnvFile (.env) arrived in 20.12
+  add('node', nodeOk ? 'pass' : 'fail', `v${process.versions.node} (need >= 20.12)`);
 
   try { add('bind', 'pass', `${assertBindAllowed(bindHost(env), env)}${env.TW_BIND ? ' (TW_BIND opt-in)' : ' (loopback)'}`); }
   catch (e) { add('bind', 'fail', e.message); }

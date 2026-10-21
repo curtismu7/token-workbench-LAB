@@ -1,9 +1,8 @@
-// Test helpers. Every test file owns a distinct slice of 5950-5999 so files running in parallel never collide.
+// Test helpers. Every test file prefers its own slice of 5950-5999; the search wraps over the whole range if a port is busy.
 import http from 'node:http';
 import net from 'node:net';
 
 export const BASES = { api: 5950, tester: 5958, checker: 5966, safety: 5974, misc: 5982, ui: 5990 };
-const SLICE_END = { api: 5957, tester: 5965, checker: 5973, safety: 5981, misc: 5989, ui: 5997 };
 
 const isFree = (port) => new Promise((resolve) => {
   const s = net.createServer();
@@ -11,20 +10,22 @@ const isFree = (port) => new Promise((resolve) => {
   s.listen(port, '127.0.0.1', () => s.close(() => resolve(true)));
 });
 
-// A run of `count` consecutive free loopback ports inside the file's own slice of 5950-5999. The search resumes
-// after the last run handed out (and wraps), so a port is not reused right after a test closed a server on it.
+// A run of `count` consecutive free loopback ports in 5950-5999. Each file prefers its own slice (BASES) but the search
+// wraps over the whole range, so a port held by another agent or a parallel run only moves the search along. The search
+// resumes after the last run handed out, so a port is not reused right after a test closed a server on it.
+const FIRST = 5950; const LAST = 5999;
 const cursor = {};
 export async function freeBase(slice, count = 8) {
-  const first = BASES[slice]; const last = SLICE_END[slice];
-  const starts = [];
-  for (let s = cursor[slice] ?? first; s + count - 1 <= last; s += 1) starts.push(s);
-  for (let s = first; s < (cursor[slice] ?? first) && s + count - 1 <= last; s += 1) starts.push(s);
-  for (const start of starts) {
+  const begin = cursor[slice] ?? BASES[slice];
+  const span = LAST - FIRST + 1;
+  for (let i = 0; i < span; i += 1) {
+    const start = FIRST + ((begin - FIRST + i) % span);
+    if (start + count - 1 > LAST) continue;
     let ok = true;
     for (let p = start; p < start + count && ok; p += 1) ok = await isFree(p);
     if (ok) { cursor[slice] = start + count; return start; }
   }
-  throw new Error(`no ${count} free ports in ${first}-${last}`);
+  throw new Error(`no ${count} free ports in ${FIRST}-${LAST}`);
 }
 
 // Like fetch, but lets a test set the Host header. Resolves { status, headers, json, raw }.
@@ -45,7 +46,11 @@ export function request(port, method, path, { headers = {}, body, host } = {}) {
 // Starts the whole app (stubs + API) on a free run of ports inside one slice: the API on base, the six stubs on base+1..base+6.
 export async function startTestApp(slice, opts = {}) {
   const { startHttpServer } = await import('../src/app.js');
-  const base = await freeBase(slice, 8);
-  const app = await startHttpServer({ port: base, stubBase: base + 1, ...opts });
+  // Another process can take a port between the check and the bind: retry on the next run of ports.
+  let base; let app;
+  for (let attempt = 0; ; attempt += 1) {
+    base = await freeBase(slice, 8);
+    try { app = await startHttpServer({ port: base, stubBase: base + 1, ...opts }); break; } catch (e) { if (e.code !== 'EADDRINUSE' || attempt >= 5) throw e; }
+  }
   return { port: app.port, runtime: app.runtime, base, close: app.close, post: (p, body, o) => request(app.port, 'POST', p, { body, ...o }), get: (p, o) => request(app.port, 'GET', p, o) };
 }

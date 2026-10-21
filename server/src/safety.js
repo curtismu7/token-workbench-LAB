@@ -29,13 +29,15 @@ const HOST_RE = /^(localhost|127(?:\.\d{1,3}){3}|\[::1\])(?::(\d{1,5}))?$/i;
 export function parseHost(hostHeader) {
   const m = HOST_RE.exec(String(hostHeader ?? '').trim());
   if (!m || !isLoopbackHost(m[1])) return null;
-  if (m[2] !== undefined && Number(m[2]) > 65535) return null;
+  if (m[2] !== undefined && (Number(m[2]) < 1 || Number(m[2]) > 65535)) return null;
   return { hostname: m[1].toLowerCase().replace(/^\[|\]$/g, ''), port: m[2] === undefined ? null : Number(m[2]), host: `${m[1]}${m[2] === undefined ? '' : `:${m[2]}`}`.toLowerCase() };
 }
 
 // Rejects a missing, malformed or non-loopback Host header (DNS rebinding): 421 Misdirected Request.
 export function hostGuard(req, res, next) {
-  if (!req.headers.host || !parseHost(req.headers.host)) {
+  // Exactly one Host header, an origin-form request target ("/path", not "http://evil.com/path"), and a loopback Host.
+  const hostCount = req.rawHeaders.filter((h, i) => i % 2 === 0 && h.toLowerCase() === 'host').length;
+  if (hostCount !== 1 || !String(req.url).startsWith('/') || !req.headers.host || !parseHost(req.headers.host)) {
     return res.status(421).json({ error: 'bad_host', message: 'this server answers loopback Host headers only' });
   }
   return next();

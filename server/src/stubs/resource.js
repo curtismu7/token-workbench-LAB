@@ -48,7 +48,7 @@ export function startResourceServer({ port, keyring, audience = identifiers(port
     const server = app.listen(port, '127.0.0.1');
     server.once('error', reject);
     server.once('listening', () => resolve({
-      port, url: `${origin}/mcp`, jwksUrl: `${origin}/issuer/.well-known/jwks.json`, stats,
+      port, host: server.address().address, url: `${origin}/mcp`, jwksUrl: `${origin}/issuer/.well-known/jwks.json`, stats,
       close: () => new Promise((r) => { server.closeAllConnections?.(); server.close(r); }),
     }));
   });

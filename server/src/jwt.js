@@ -44,6 +44,7 @@ export function jwkThumbprint(jwk) {
   return b64u(crypto.createHash('sha256').update(canon).digest());
 }
 
+const KNOWN_CLAIMS = new Set(['iss', 'sub', 'aud', 'scope', 'scp', 'client_id', 'azp', 'act', 'may_act', 'cnf', 'iat', 'nbf', 'exp', 'jti']);
 const fmtTime = (secs) => new Date(secs * 1000).toISOString();
 const asList = (v) => (Array.isArray(v) ? v : v === undefined ? [] : [v]);
 
@@ -98,6 +99,13 @@ export function explainClaims(header, payload, nowSec) {
     add(name, v, meaning, level);
   }
   if ('jti' in payload) add('jti', payload.jti, 'A unique token id, usable to detect replay or to revoke one token.');
+  // Any other claim is listed too (bounded), so nothing in the payload is hidden from the table.
+  let extra = 0;
+  for (const [k, v] of Object.entries(payload)) {
+    if (KNOWN_CLAIMS.has(k)) continue;
+    if ((extra += 1) > 50) break;
+    add(revealText(k, 128), v, 'A claim this workbench does not explain. Shown as the token carries it.');
+  }
   return out;
 }
 
