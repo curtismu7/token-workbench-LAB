@@ -115,6 +115,11 @@ test('source scan: only http.js opens outbound connections; no fs writes; no env
   }
 });
 
+test('the checker never builds a credential header', () => {
+  const text = fs.readFileSync(path.join(srcDir, 'checker.js'), 'utf8');
+  assert.doesNotMatch(text, /['"]?authorization['"]?\s*:|bearer|x-api-key|client_secret|\bcookie\b/i);
+});
+
 test('private keys exist only in memory: nothing exports a private key and no key material is in the repo', () => {
   const keys = fs.readFileSync(path.join(srcDir, 'keys.js'), 'utf8');
   assert.doesNotMatch(keys, /privateKey\.export|\.export\(\{[^}]*pkcs8|\.export\(\{[^}]*type:/);
