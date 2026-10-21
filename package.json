@@ -1,0 +1,20 @@
+{
+  "name": "token-workbench",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Mock-only token workbench: decode and explain tokens, test wrong-token rejection against a stub resource server, check stub authorization servers against OAuth rules, compare PAR/RAR/DPoP/mTLS/JAR/PKCE flows. Stubs only; nothing real is touched.",
+  "license": "MIT",
+  "workspaces": [
+    "server"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "npm start -w server",
+    "test": "npm test -w server && node --test scripts/*.test.mjs",
+    "doctor": "node scripts/doctor.mjs",
+    "prepare": "git config core.hooksPath .githooks || true"
+  }
+}
