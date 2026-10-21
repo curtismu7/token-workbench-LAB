@@ -2,8 +2,8 @@
 import http from 'node:http';
 import net from 'node:net';
 
-export const BASES = { api: 5950, tester: 5960, checker: 5970, safety: 5980, misc: 5990 };
-const SLICE_END = { api: 5959, tester: 5969, checker: 5979, safety: 5989, misc: 5999 };
+export const BASES = { api: 5950, tester: 5958, checker: 5966, safety: 5974, misc: 5982, ui: 5990 };
+const SLICE_END = { api: 5957, tester: 5965, checker: 5973, safety: 5981, misc: 5989, ui: 5997 };
 
 const isFree = (port) => new Promise((resolve) => {
   const s = net.createServer();

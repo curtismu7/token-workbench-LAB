@@ -16,7 +16,7 @@ const tmpDist = (t) => {
 };
 
 test('the built UI is served by the server itself with a same-origin CSP, and the Host and Origin guards still apply', async (t) => {
-  const app = await startTestApp('misc', { webDist: tmpDist(t) }); t.after(app.close);
+  const app = await startTestApp('ui', { webDist: tmpDist(t) }); t.after(app.close);
   const root = await app.get('/');
   assert.equal(root.status, 200);
   assert.match(root.headers['content-type'], /text\/html/);
@@ -39,7 +39,7 @@ test('the built UI is served by the server itself with a same-origin CSP, and th
 });
 
 test('without a built UI, GET / is a JSON 404', async (t) => {
-  const app = await startTestApp('misc', { webDist: path.join(os.tmpdir(), 'tw-no-such-dist') }); t.after(app.close);
+  const app = await startTestApp('ui', { webDist: path.join(os.tmpdir(), 'tw-no-such-dist') }); t.after(app.close);
   const res = await app.get('/');
   assert.equal(res.status, 404);
   assert.equal(res.json.error, 'not_found');
