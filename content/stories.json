@@ -1,0 +1,6 @@
+[
+  { "id": "S01", "title": "Read", "say": "A token is only text. Decoding shows what it says, offline. Anyone can write any claims, so nothing is trusted until the signature is checked." },
+  { "id": "S02", "title": "Break", "say": "Fifteen wrong tokens are sent to a stub resource server. A correct one refuses each for the right reason, with the right error." },
+  { "id": "S03", "title": "Check", "say": "Five stub authorization servers are probed against OAuth security rules. The FAPI 2.0 pack is UNVERIFIED." },
+  { "id": "S04", "title": "Compare", "say": "PKCE, PAR, RAR, DPoP, mTLS and JAR each stop one attack. This is a simulation of the mechanisms, not of any product." }
+]
