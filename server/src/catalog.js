@@ -4,10 +4,10 @@
 // in memory, so the verdict is derived, not typed in. Nothing here touches a network; keys and certificates are
 // generated per run and thrown away.
 import crypto from 'node:crypto';
-import { b64u, jwkThumbprint, signJwt, verifyEs256, parseJwt } from './jwt.js';
+import { b64u, generateEcKeyPair, jwkThumbprint, signJwt, verifyEs256, parseJwt } from './jwt.js';
 
 const sha = (s) => crypto.createHash('sha256').update(s).digest();
-const ec = () => { const k = crypto.generateKeyPairSync('ec', { namedCurve: 'P-256' }); return { priv: k.privateKey, jwk: k.publicKey.export({ format: 'jwk' }) }; };
+const ec = () => { const k = generateEcKeyPair(); return { priv: k.privateKey, jwk: k.publicKey.export({ format: 'jwk' }) }; };
 const rnd = () => b64u(crypto.randomBytes(24));
 
 // Actors: client, browser, as (authorization server), rs (resource server), attacker.

@@ -6,6 +6,19 @@ export const b64u = (buf) => Buffer.from(buf).toString('base64url');
 const fromB64u = (s) => Buffer.from(s, 'base64url');
 export const b64uJson = (obj) => b64u(JSON.stringify(obj));
 
+// P-256 key pair built from an ECDH key, kept in memory only (the crypto keygen helpers abort on Node 20 in CI).
+export function generateEcKeyPair() {
+  const ecdh = crypto.createECDH('prime256v1');
+  ecdh.generateKeys();
+  const pub = ecdh.getPublicKey();
+  const d = Buffer.alloc(32); ecdh.getPrivateKey().copy(d, 32 - ecdh.getPrivateKey().length);
+  const jwk = { kty: 'EC', crv: 'P-256', x: b64u(pub.subarray(1, 33)), y: b64u(pub.subarray(33, 65)) };
+  return {
+    publicKey: crypto.createPublicKey({ key: jwk, format: 'jwk' }),
+    privateKey: crypto.createPrivateKey({ key: { ...jwk, d: b64u(d) }, format: 'jwk' }),
+  };
+}
+
 export const MAX_TOKEN_CHARS = 8192;
 const TOKEN_CHARS = /^[A-Za-z0-9_-]*\.[A-Za-z0-9_-]*\.[A-Za-z0-9_-]*$/;
 
