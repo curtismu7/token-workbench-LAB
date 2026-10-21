@@ -61,6 +61,27 @@ test('the Dockerfile installs production dependencies only, ships server/src, an
   assert.doesNotMatch(df, /TW_LIVE/);
 });
 
-test('the healthcheck uses /api/health', () => {
+test('the healthcheck uses /api/health, in compose and in the image', () => {
   assert.match(code, /\/api\/health/);
+  const df = fs.readFileSync(new URL('../Dockerfile', import.meta.url), 'utf8').split('\n').filter((l) => !/^\s*#/.test(l)).join('\n');
+  assert.match(df, /^HEALTHCHECK .*\/api\/health/m);
+});
+
+test('the Dockerfile builds web/dist in a first stage and ships it; no key, cert or env file is copied in', () => {
+  const df = fs.readFileSync(new URL('../Dockerfile', import.meta.url), 'utf8').split('\n').filter((l) => !/^\s*#/.test(l)).join('\n');
+  assert.match(df, /^FROM node:\S+ AS build$/m);
+  assert.match(df, /RUN npm run build -w web/);
+  assert.match(df, /COPY --from=build \/app\/web\/dist web\/dist/);
+  assert.equal((df.match(/^FROM /gm) || []).length, 2);
+  assert.doesNotMatch(df, /COPY\s+(?:--\S+\s+)*\.\s/, 'no wholesale COPY . (it would bake in anything in the checkout)');
+  assert.doesNotMatch(df, /\.(pem|key|p12|env)\b|COPY .*\.env/);
+  const ignore = fs.readFileSync(new URL('../.dockerignore', import.meta.url), 'utf8');
+  for (const pat of ['.env', '*.pem', '*.key', 'node_modules', '.git']) assert.ok(ignore.split('\n').includes(pat), `.dockerignore lists ${pat}`);
+});
+
+test('the image runs on the documented port only (EXPOSE 5910, TW_PORT 5910)', () => {
+  const df = fs.readFileSync(new URL('../Dockerfile', import.meta.url), 'utf8');
+  assert.match(df, /^EXPOSE 5910$/m);
+  assert.match(df, /TW_PORT=5910/);
+  assert.doesNotMatch(df, /EXPOSE (?!5910$)/m);
 });
