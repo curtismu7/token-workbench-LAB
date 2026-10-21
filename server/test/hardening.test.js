@@ -176,7 +176,7 @@ test('jwt: signature verification fails closed on a bad key, a bad signature and
   const tok = ring.sign({}, { a: 1 }); const [h, p, s] = tok.split('.');
   const jwk = ring.jwks().keys[0];
   assert.equal(verifyEs256(`${h}.${p}`, s, jwk), true);
-  assert.equal(verifyEs256(`${h}.${p}`, s.replace(/.$/, s.endsWith('A') ? 'B' : 'A'), jwk), false);
+  assert.equal(verifyEs256(`${h}.${p}`, `${s[0] === 'A' ? 'B' : 'A'}${s.slice(1)}`, jwk), false);
   assert.equal(verifyEs256(`${h}.${p}`, s, { kty: 'EC', crv: 'P-256', x: 'bad', y: 'bad' }), false);
   assert.equal(verifyEs256(`${h}.${p}`, s, null), false);
   assert.equal(verifyEs256(`${h}.${p}`, '!!', jwk), false);

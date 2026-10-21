@@ -15,7 +15,17 @@ const isFree = (port) => new Promise((resolve) => {
 // resumes after the last run handed out, so a port is not reused right after a test closed a server on it.
 const FIRST = 5950; const LAST = 5999;
 const cursor = {};
+const sleep = (ms) => new Promise((r) => { setTimeout(r, ms); });
 export async function freeBase(slice, count = 8) {
+  // Other runs on this machine can briefly hold many ports: wait for a free run instead of failing at once.
+  for (let attempt = 0; attempt < 60; attempt += 1) {
+    const found = await findBase(slice, count);
+    if (found !== null) return found;
+    await sleep(500);
+  }
+  throw new Error(`no ${count} free ports in ${FIRST}-${LAST}`);
+}
+async function findBase(slice, count) {
   const begin = cursor[slice] ?? BASES[slice];
   const span = LAST - FIRST + 1;
   for (let i = 0; i < span; i += 1) {
@@ -25,7 +35,7 @@ export async function freeBase(slice, count = 8) {
     for (let p = start; p < start + count && ok; p += 1) ok = await isFree(p);
     if (ok) { cursor[slice] = start + count; return start; }
   }
-  throw new Error(`no ${count} free ports in ${FIRST}-${LAST}`);
+  return null;
 }
 
 // Like fetch, but lets a test set the Host header. Resolves { status, headers, json, raw }.
@@ -49,7 +59,7 @@ export async function startTestApp(slice, opts = {}) {
   // Another process can take a port between the check and the bind: retry on the next run of ports.
   let base; let app;
   for (let attempt = 0; ; attempt += 1) {
-    base = await freeBase(slice, 8);
+    base = await freeBase(slice, 7);
     try { app = await startHttpServer({ port: base, stubBase: base + 1, ...opts }); break; } catch (e) { if (e.code !== 'EADDRINUSE' || attempt >= 5) throw e; }
   }
   return { port: app.port, runtime: app.runtime, base, close: app.close, post: (p, body, o) => request(app.port, 'POST', p, { body, ...o }), get: (p, o) => request(app.port, 'GET', p, o) };
