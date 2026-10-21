@@ -3,6 +3,9 @@
 // The token under test is DATA in a JSON body: it is never read from a header, never logged, never sent anywhere
 // except (for the tester) to the stub resource server on loopback.
 import express from 'express';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { createHealth } from './health.js';
 import { createRuntime } from './runtime.js';
 import { assertBindAllowed, bindHost, credentialGuard, hostGuard, originGuard, serverPort } from './safety.js';
@@ -18,6 +21,9 @@ import { ALLOWED_ALGS } from './validator.js';
 
 const wrap = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
 const bad = (res, message, status = 400, error) => res.status(status).json({ error: error || (status === 404 ? 'not_found' : 'bad_request'), message });
+export const DEFAULT_WEB_DIST = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../web/dist');
+// The built UI: same-origin scripts, styles, images and fetches only. (style-src allows inline styles: React Flow sets them.)
+export const UI_CSP = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'";
 const API_HEADERS = { 'X-Content-Type-Options': 'nosniff', 'Content-Security-Policy': "default-src 'none'", 'Cache-Control': 'no-store', 'Referrer-Policy': 'no-referrer' };
 
 // A POST body must be a plain JSON object with only the listed keys. Anything else (including a password or secret
@@ -38,12 +44,19 @@ const SAMPLES = {
   expired: { title: 'Expired token', make: (c, t) => ({ iss: c.ids.issuer, sub: 'user-123', aud: c.ids.resource, scope: 'mcp:tools', iat: t - 7200, exp: t - 3600 }) },
 };
 
-export function createApp({ runtime, health = createHealth() } = {}) {
+// webDist: directory with the built UI (web/dist). null disables static serving; a missing directory serves JSON 404 at /.
+export function createApp({ runtime, health = createHealth(), webDist = DEFAULT_WEB_DIST } = {}) {
   const app = express();
   app.disable('x-powered-by');
   app.use(hostGuard);
   app.use(originGuard);
   app.use((_req, res, next) => { res.set(API_HEADERS); next(); });
+  if (webDist && fs.existsSync(path.join(webDist, 'index.html'))) {
+    app.use(express.static(webDist, {
+      index: 'index.html', dotfiles: 'ignore',
+      setHeaders: (res) => res.set({ ...API_HEADERS, 'Content-Security-Policy': UI_CSP }),
+    }));
+  }
 
   const api = express.Router();
   api.use(credentialGuard);
@@ -143,12 +156,12 @@ export function createApp({ runtime, health = createHealth() } = {}) {
 }
 
 // Boot on `port`. Refuses a non-loopback host unless TW_BIND is set.
-export async function startHttpServer({ port = serverPort(), host = bindHost(), env = process.env, runtime, stubBase } = {}) {
+export async function startHttpServer({ port = serverPort(), host = bindHost(), env = process.env, runtime, stubBase, webDist } = {}) {
   assertBindAllowed(host, env);
   const rt = runtime || await createRuntime({ stubBase });
   const health = createHealth({ env });
   return new Promise((resolve, reject) => {
-    const httpServer = createApp({ runtime: rt, health }).listen(port, host);
+    const httpServer = createApp({ runtime: rt, health, ...(webDist !== undefined ? { webDist } : {}) }).listen(port, host);
     httpServer.once('error', async (e) => { health.stop(); await rt.close(); reject(e); });
     httpServer.once('listening', () => {
       const { port: bound } = httpServer.address();
