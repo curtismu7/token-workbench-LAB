@@ -3,7 +3,7 @@
 One Node process (Express, ESM). It starts the stubs and the API together and talks to the stubs over real loopback HTTP, so the HTTP behaviour you see (status codes, `WWW-Authenticate`, redirects) is real HTTP, not function calls.
 
 ```
-client (curl / later the web UI)
+client (the web UI served from web/dist, or curl)
    |  JSON over HTTP, 127.0.0.1:5910
    v
 API (server/src/app.js)  host guard -> origin/CSRF guard -> credential guard -> JSON body (16 KB)
@@ -16,7 +16,7 @@ API (server/src/app.js)  host guard -> origin/CSRF guard -> credential guard -> 
 
 ## Ports
 
-All in 5900-5999. `5910` API. `5911-5915` the five authorization-server profiles (`good`, `loose-redirect`, `implicit-ropc`, `no-pkce`, `missing-metadata`). `5916` stub resource server and issuer. `5917-5919` reserved for the stubs. `5930` reserved for the Vite dev server, `5940` for the e2e script (step 2). Tests take a free run of ports from `5950-5999`, each test file in its own slice.
+All in 5900-5999. `5910` API. `5911-5915` the five authorization-server profiles (`good`, `loose-redirect`, `implicit-ropc`, `no-pkce`, `missing-metadata`). `5916` stub resource server and issuer. `5917-5919` reserved for the stubs. `5930` reserved for the Vite dev server, `5940` for the e2e script. Tests take a free run of ports from `5950-5997`, each test file in its own 8-port slice.
 
 ## Modules (`server/src`)
 
@@ -51,4 +51,19 @@ A mechanism is data (name, RFC, the attack it stops, a list of steps tagged `pro
 
 ## Not here yet
 
-Step 2: the React + Vite UI (dark/light, token decode view, tester table, checker scorecard, flow diagrams). Step 3: content pack, shelf entry, e2e.
+Step 3: content pack, shelf entry, a web build stage in the Dockerfile, CI.
+
+## The web UI (`web/`)
+
+React 18 + Vite, `@xyflow/react` 12.12.0 for the diagram, vitest and testing-library for tests. The server serves `web/dist` at `/` with a same-origin-only CSP (`default-src 'self'`, no inline script, no `unsafe-eval`; inline styles are allowed because React Flow sets them), on the same host and Origin guards as the API. The API keeps `default-src 'none'`.
+
+| File | Role |
+| --- | --- |
+| `web/src/lib/api.js` | The only place that calls `fetch`: JSON bodies, `credentials: "omit"`, no credential headers. |
+| `web/src/components/Decode.jsx` | Paste or mint a token, claims table, countdown, signature badge, `cnf` note. |
+| `web/src/components/Tester.jsx` | The 15-case matrix: expected vs actual, challenge, rejecting check, lesson. |
+| `web/src/components/Checker.jsx` | Profile choice or loopback URL, both rule packs, UNVERIFIED badge on FAPI. |
+| `web/src/components/Flows.jsx` | Comparison table, with/without side by side, the React Flow diagram with Simulate, Reset and speed. |
+| `web/src/components/Story.jsx`, `Badge.jsx` | The four-step story strip; outcome words with colour. |
+
+Server strings (claims, headers, evidence, error text) are only ever rendered as React text nodes. A test feeds an `<img onerror>` string through the decode tab and asserts no element is created. `scripts/e2e.mjs` drives the built UI in headless Chromium: all four tabs, keyboard-only reach, hostile text, drag, Simulate and Reset, no console errors, no request that leaves the origin, no horizontal scroll at 390px, and dark and light screenshots.
