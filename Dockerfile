@@ -1,4 +1,4 @@
-# Server only (the web UI arrives in step 2). Mock mode: the stubs run inside this container, on its own loopback.
+# Server only: this image ships NO web UI (web/dist is not copied), so GET / is a JSON 404 inside the container. Mock mode: the stubs run inside this container, on its own loopback.
 FROM node:22-alpine
 WORKDIR /app
 ENV NODE_ENV=production TW_PORT=5910

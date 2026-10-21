@@ -11,6 +11,7 @@
 // running token-workbench first: the stub ports are fixed.
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
+import net from 'node:net';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
@@ -25,6 +26,10 @@ const port = Number(process.env.E2E_PORT) || 5940;
 if (!(port >= 5900 && port <= 5999)) { console.error('E2E_PORT must be in 5900-5999'); process.exit(2); }
 const base = `http://127.0.0.1:${port}`;
 if (!fs.existsSync(path.join(root, 'web', 'dist', 'index.html'))) { console.error('Run `npm run build` first.'); process.exit(2); }
+// The stub ports are fixed (5911-5916): say so plainly instead of printing a stack trace if something already holds one.
+const busy = [];
+for (let p = 5911; p <= 5916; p += 1) if (!await new Promise((res) => { const s = net.createServer(); s.once('error', () => res(false)); s.listen(p, '127.0.0.1', () => s.close(() => res(true))); })) busy.push(p);
+if (busy.length) { console.error(`stub port(s) ${busy.join(', ')} are in use (another token-workbench or e2e run?). Stop it and retry.`); process.exit(2); }
 const server = spawn(process.execPath, ['server/src/index.js'], { cwd: root, env: { ...process.env, TW_PORT: String(port) }, stdio: 'inherit' });
 let up = false;
 for (let i = 0; i < 60 && !up; i++) { try { up = (await fetch(`${base}/api/health`)).ok; } catch { await sleep(250); } }

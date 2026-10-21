@@ -31,8 +31,10 @@ npm test            # server (node:test), web (vitest) and script tests
 npm run build       # builds web/dist, which the server serves at /
 npm start           # http://127.0.0.1:5910/  (TW_PORT to change; ports 5900-5999 only)
 npm run dev         # Vite dev server on 5930, proxying /api to the server on 5910 (start the server first)
-npm run e2e         # real Chromium against the real server on 5940; needs npm run build first
+npm run e2e         # real Chromium against the real server on 5940; needs npm run build first and a Playwright browser (`npx playwright install chromium`, once)
 ```
+
+Ports: the stubs use fixed ports 5911-5916 (no override), so `npm start` and `npm run e2e` cannot run at the same time, and two clones cannot both run the app. The server tests pick free runs of ports in 5950-5999 (they move past a busy port), so parallel test runs mostly coexist, but a very crowded range can still fail with `no 8 free ports`; stop the other runs and retry.
 
 ```bash
 curl -s http://127.0.0.1:5910/api/health
