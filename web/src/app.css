@@ -33,6 +33,7 @@ code, .mono { font-family: var(--mono); font-size: 0.85rem; overflow-wrap: anywh
 .skip:focus { top: 0.5rem; }
 :focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
 
+.banner.hosted { background: var(--info-wash); color: var(--info); border-bottom: 2px solid var(--info); font-weight: 600; }
 .banner.warn { background: var(--hold-wash); color: var(--hold); border-bottom: 2px solid var(--hold); }
 .top { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 1.25rem; padding: 0.6rem 1rem; border-bottom: 1px solid var(--border); background: var(--card); }
 .top nav { display: flex; flex-wrap: wrap; gap: 0.25rem; flex: 1 1 12rem; }

@@ -49,7 +49,7 @@ describe("shell", () => {
     await screen.findByTestId("decode-result");
     const post = calls.find((c) => c.method === "POST" && c.path === "/api/decode");
     expect(post.init.credentials).toBe("omit");
-    expect(Object.keys(post.init.headers).map((h) => h.toLowerCase()).sort()).toEqual(["accept", "content-type"]);
+    expect(Object.keys(post.init.headers).map((h) => h.toLowerCase()).sort()).toEqual(["accept", "content-type", "x-workspace-id"]); // the workspace label is the only addition; it is not a credential
     expect(JSON.parse(post.init.body)).toEqual({ token: fakeToken(), verify: false });
     for (const c of calls) expect(Object.keys(c.init.headers || {}).some((h) => /authorization|cookie|dpop/i.test(h))).toBe(false);
   });

@@ -28,6 +28,12 @@ Port 5910 is the app; stubs use fixed ports 5911-5916, so `npm start` and `npm r
 - Docker is OrbStack only, never Docker Desktop. Compose publishes `127.0.0.1` only.
 - Minted tokens are labelled mock; the FAPI 2.0 pack is UNVERIFIED. Any claim about a Ping product is UNVERIFIED unless it has a source.
 
+## Hosted mock build (rule 18)
+
+- Same image, `MODE=local` (default) or `MODE=se-mock`. In se-mock: workspace per `X-Workspace-Id` (`server/src/workspaces.js`; all state hangs off `req.rt`, so a new handler must use `req.rt`, never the boot `runtime`), typed checker targets refused, live flags refuse startup, banner via `/api/meta`.
+- `k8s/` has the manifests (tokens `__IMAGE__`, `__SE_HOST__` only) and `deploy.sh`. NEVER run `k8s/deploy.sh --apply` or kubectl: the first SE deploy is owner-approved. `--dry-run` is safe.
+- Pinned by `server/test/hosted.test.js`, `web/src/Hosted.test.jsx`, `scripts/k8s.test.mjs`. Details and the state inventory: [docs/k8s.md](docs/k8s.md).
+
 ## Where the safety claims are pinned
 
 - `server/test/safety.test.js`, `server/test/hardening.test.js`: loopback bind, port range, Host/Origin, listeners.

@@ -36,6 +36,7 @@ function Pack({ id, pack }) {
 
 export default function Checker({ announce }) {
   const [profiles, setProfiles] = useState([]);
+  const [hosted, setHosted] = useState(false);
   const [choice, setChoice] = useState("good");
   const [url, setUrl] = useState("");
   const [pack, setPack] = useState("both");
@@ -43,7 +44,7 @@ export default function Checker({ announce }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
-  useEffect(() => { getMeta().then((m) => setProfiles(m.profiles), (e) => setError(e.message)); }, []);
+  useEffect(() => { getMeta().then((m) => { setProfiles(m.profiles); setHosted(!!m.hosted); }, (e) => setError(e.message)); }, []);
 
   const run = async () => {
     setBusy(true); setError(""); announce("Running");
@@ -58,7 +59,7 @@ export default function Checker({ announce }) {
   return (
     <section aria-labelledby="h-checker">
       <h2 id="h-checker">OAuth profile checker</h2>
-      <p className="lede">Pick one of the five stub authorization servers, or a loopback URL you started yourself, and probe it against an RFC 9700 pack and a simplified FAPI 2.0 pack. No credentials are sent and nothing leaves this machine.</p>
+      <p className="lede">Pick one of the five stub authorization servers{hosted ? "" : ", or a loopback URL you started yourself,"} and probe it against an RFC 9700 pack and a simplified FAPI 2.0 pack. No credentials are sent and {hosted ? "only the simulated stub servers in this hosted demo are probed." : "nothing leaves this machine."}</p>
       <div className="card">
         <fieldset>
           <legend>Target</legend>
@@ -66,9 +67,9 @@ export default function Checker({ announce }) {
             <label key={p.id} className="radio"><input type="radio" name="target" value={p.id} checked={choice === p.id} onChange={() => setChoice(p.id)} />
               <span><strong>{p.title}</strong><br /><span className="muted small">{p.blurb}</span></span></label>
           ))}
-          <label className="radio"><input type="radio" name="target" value="url" checked={choice === "url"} onChange={() => setChoice("url")} />
-            <span><strong>A loopback URL</strong><br /><span className="muted small">http://127.0.0.1:PORT or http://localhost:PORT only. Anything else is refused.</span></span></label>
-          {choice === "url" && (
+          {!hosted && <label className="radio"><input type="radio" name="target" value="url" checked={choice === "url"} onChange={() => setChoice("url")} />
+            <span><strong>A loopback URL</strong><br /><span className="muted small">http://127.0.0.1:PORT or http://localhost:PORT only. Anything else is refused.</span></span></label>}
+          {!hosted && choice === "url" && (
             <div><label htmlFor="turl" className="lbl">Loopback URL</label><input id="turl" className="mono" type="text" value={url} onChange={(e) => setUrl(e.target.value)} placeholder="http://127.0.0.1:5999" spellCheck={false} autoComplete="off" /></div>
           )}
         </fieldset>

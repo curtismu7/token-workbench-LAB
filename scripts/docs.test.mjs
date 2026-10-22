@@ -4,7 +4,7 @@ import path from 'node:path';
 import { test } from 'node:test';
 
 const root = new URL('..', import.meta.url).pathname;
-const docs = ['README.md', 'docs/safety.md', 'docs/architecture.md'];
+const docs = ['README.md', 'docs/safety.md', 'docs/architecture.md', 'docs/k8s.md'];
 const read = (f) => fs.readFileSync(path.join(root, f), 'utf8');
 
 test('relative links in README and docs resolve to files that exist', () => {
@@ -64,4 +64,10 @@ test('CLAUDE.md and the talk track exist and mention the app port', () => {
     assert.ok(fs.existsSync(path.join(root, f)), `${f} is missing`);
     assert.match(read(f), /5910/, `${f} does not mention port 5910`);
   }
+});
+
+test('docs/k8s.md covers the rule 18 build: refused live features, isolation, the owner approval and residual risks', () => {
+  const k = read('docs/k8s.md');
+  for (const re of [/MODE=se-mock/, /owner-approved/i, /OWNER_APPROVED=1/, /Residual risks/, /X-Workspace-Id/, /hosted_build/, /HOSTED SIMULATION/, /Every piece of state/, /UNVERIFIED/]) assert.match(k, re);
+  for (const f of ['server/src/keys.js', 'server/src/runtime.js', 'server/src/stubs/authserver.js', 'server/src/stubs/resource.js', 'server/src/checker.js', 'server/src/health.js', 'server/src/workspaces.js']) assert.ok(k.includes(f), `state table misses ${f}`);
 });

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { getHealth } from "./lib/api.js";
+import { getHealth, getMeta } from "./lib/api.js";
 import Decode from "./components/Decode.jsx";
 import Tester from "./components/Tester.jsx";
 import Checker from "./components/Checker.jsx";
@@ -17,11 +17,14 @@ export default function App() {
   const [tab, setTab] = useState("decode");
   const [health, setHealth] = useState(null);
   const [message, setMessage] = useState("");
+  const [hostedBanner, setHostedBanner] = useState(null);
 
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", theme);
     safe(() => localStorage.setItem("tw-theme", theme));
   }, [theme]);
+  // The hosted build (MODE=se-mock) serves its banner text in /api/meta; the local build serves none.
+  useEffect(() => { getMeta().then((m) => setHostedBanner(m?.hosted && typeof m.banner === "string" ? m.banner : null), () => {}); }, []);
   useEffect(() => { getHealth().then(setHealth, () => setHealth({ unreachable: true })); }, []);
 
   const dark = theme === "dark";
@@ -30,6 +33,7 @@ export default function App() {
       <a className="skip" href="#main" onClick={(e) => { e.preventDefault(); document.getElementById("main")?.focus(); }}>Skip to content</a>
       {health?.unreachable && <div className="banner warn" role="alert">Cannot reach the Token Workbench API. Is the server running?</div>}
       {health && !health.unreachable && health.state !== "ready" && <div className="banner warn" role="alert">Server health is {health.state}. Run <code>npm run doctor</code>.</div>}
+      {hostedBanner && <div className="banner hosted" role="note" data-testid="hosted-banner">{hostedBanner}</div>}
       <header className="top">
         <h1>Token Workbench</h1>
         <span className="mode mode--demo" data-testid="mode-badge">DEMO<span className="sr-only">: stub servers on loopback, nothing real is contacted</span></span>

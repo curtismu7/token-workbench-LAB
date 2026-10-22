@@ -1,7 +1,23 @@
 // Thin fetch wrapper. JSON in, JSON out. No credential headers, no cookies: the server refuses them. The token under
 // test is DATA in a JSON body, never an Authorization header.
+// One workspace per browser tab (sessionStorage), so a hosted visitor's keys, runs and results are private to the tab.
+// The id is a label, not a credential. The local build ignores the header.
+let memoryId = null;
+export function workspaceId() {
+  try {
+    let id = sessionStorage.getItem("tw-workspace");
+    if (!id) { id = newId(); sessionStorage.setItem("tw-workspace", id); }
+    return id;
+  } catch { memoryId ||= newId(); return memoryId; }
+}
+function newId() {
+  const bytes = new Uint8Array(8);
+  try { crypto.getRandomValues(bytes); } catch { for (let i = 0; i < bytes.length; i += 1) bytes[i] = Math.floor(Math.random() * 256); }
+  return `ws-${Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("")}`;
+}
+
 async function call(path, method = "GET", body) {
-  const init = { method, credentials: "omit", headers: { Accept: "application/json" } };
+  const init = { method, credentials: "omit", headers: { Accept: "application/json", "X-Workspace-Id": workspaceId() } };
   if (body !== undefined) { init.headers["Content-Type"] = "application/json"; init.body = JSON.stringify(body); }
   let res;
   try { res = await fetch(path, init); } catch { throw new Error("cannot reach the Token Workbench server"); }

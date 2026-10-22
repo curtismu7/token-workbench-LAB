@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- k8s: rule 18 mock-only SE build. `MODE=local|se-mock` on the same image; in se-mock every visitor has a private workspace (stub keys, five stub authorization servers, resource server, run queue; `X-Workspace-Id`, capped at 20, idle TTL 30 min, busy workspaces never evicted), typed checker targets and live flags are refused, `/api/meta` serves the HOSTED SIMULATION banner (shown on every tab) and health carries `mode`. `TW_PUBLIC_ORIGIN` accepts the ingress origin for POSTs. `k8s/` manifests (non-root, read-only root, drop ALL, probes, limits, 1 replica) and `deploy.sh` (`--dry-run` / `--apply` with `OWNER_APPROVED=1`), `docs/k8s.md`, tests. Local behaviour with `MODE` unset is unchanged. Not deployed.
+
 ## 0.1.0
 
 - TW0 (step 1, core): loopback/Host/CSRF/credential guards, `demo-health/1`, doctor; offline token decode and claim explanations; in-memory stub issuer and fail-closed validator; stub MCP-style resource server and a 15-case wrong-token tester; five stub authorization servers and an OAuth profile checker (RFC 9700 pack and a simplified, UNVERIFIED FAPI 2.0 pack); token-flow catalog (PAR, RAR, DPoP, mTLS, JAR, PKCE) with a mock flow runner; Dockerfile and loopback-only compose.
