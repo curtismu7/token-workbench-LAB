@@ -58,3 +58,10 @@ test('no literal JWT or key material is committed in tests or docs', () => {
     assert.doesNotMatch(fs.readFileSync(f, 'utf8'), /eyJ[A-Za-z0-9_-]{10,}\.eyJ/, `${f} contains a literal JWT`);
   }
 });
+
+test('CLAUDE.md and the talk track exist and mention the app port', () => {
+  for (const f of ['CLAUDE.md', 'docs/talk-track.md']) {
+    assert.ok(fs.existsSync(path.join(root, f)), `${f} is missing`);
+    assert.match(read(f), /5910/, `${f} does not mention port 5910`);
+  }
+});
