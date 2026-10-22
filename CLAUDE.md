@@ -1,0 +1,43 @@
+# CLAUDE.md
+
+Token Workbench is a mock-only workbench for OAuth and JWT tokens (tier: Tester). It decodes and explains a token offline, sends 15 wrong tokens to a stub resource server, checks five stub authorization servers against OAuth rules, and compares PKCE, PAR, RAR, DPoP, mTLS and JAR with and without protection. Everything runs in-process on loopback. Details are in [README.md](README.md), [docs/safety.md](docs/safety.md) and [docs/architecture.md](docs/architecture.md); do not copy them here.
+
+## Commands (from package.json)
+
+```bash
+npm install
+npm test             # server (node:test) + web (vitest) + node --test scripts/*.test.mjs
+npm run build        # web/dist, served by the server at /
+npm run doctor       # node, bind, port range, free ports
+npm run e2e          # real Chromium on port 5940; build first
+npm run content-pack # regenerate and validate content-pack.json
+npm start            # http://127.0.0.1:5910/  (TW_PORT; must be in 5900-5999)
+```
+
+Port 5910 is the app; stubs use fixed ports 5911-5916, so `npm start` and `npm run e2e` cannot run together. Port range is 5900-5999.
+
+## Rules that bite here
+
+- Loopback only, with the Host and Origin guards. No real network, no real tenants; the only outbound target the checker accepts is a user-typed loopback `http://` URL.
+- Server-provided text is rendered inert (React text nodes, never HTML).
+- Test scripts use globs (`node --test scripts/*.test.mjs`), never a directory.
+- Never use `crypto.generateKeyPairSync` or async `generateKeyPair` for EC keys (SIGABRT on Node 20 in CI); use `createECDH` + `createPrivateKey`/`createPublicKey` or fixtures.
+- Never parse `node:test` stdout; use the exit code.
+- History scan `git log -p --all | grep -cF -f ~/.config/demo-kit/forbidden-strings.txt` must print 0. Never print that list.
+- gitleaks runs in the pre-commit hook (`.githooks/pre-commit`); keep it installed.
+- Docker is OrbStack only, never Docker Desktop. Compose publishes `127.0.0.1` only.
+- Minted tokens are labelled mock; the FAPI 2.0 pack is UNVERIFIED. Any claim about a Ping product is UNVERIFIED unless it has a source.
+
+## Where the safety claims are pinned
+
+- `server/test/safety.test.js`, `server/test/hardening.test.js`: loopback bind, port range, Host/Origin, listeners.
+- `server/test/netguard.js` and the tests using it: zero outbound calls.
+- `server/test/ui.test.js`, `web/src/Honesty.test.jsx`: inert text and the simulation/UNVERIFIED labels.
+- `scripts/compose.test.mjs`: Docker publishes loopback only.
+- `scripts/docs.test.mjs`: docs name real scripts, files, routes and the UNVERIFIED wording.
+
+## Shelf and content pack
+
+- Shelf entry: `docs/shelf-entry.json`, checked by `scripts/shelf-entry.test.mjs`. Edit `composeFile` per checkout; the catalog id is C2.
+- Content pack: edit `content/*.json`, run `npm run content-pack`, commit `content-pack.json`. Story text must match the UI story strip (a test checks it).
+- Presenter script: [docs/talk-track.md](docs/talk-track.md).
