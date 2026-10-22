@@ -1,0 +1,52 @@
+# MOCK-ONLY hosted build of token-workbench for the SE cluster (rule 18). The SAME image as the standalone, MODE=se-mock.
+# In this mode every live-ish feature is refused (the checker accepts the built-in stub servers only), every visitor gets
+# a private workspace, and the UI shows the "hosted and simulated" banner. No secrets, no tenant ids, no volumes with data.
+# The image and the public host below are placeholder tokens that k8s/deploy.sh fills in; nothing here names a real host or registry path.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: token-workbench
+  labels: { app: token-workbench }
+spec:
+  replicas: 1   # state (stub keys, runs, results) is in memory and per workspace; more replicas would split a visitor's workspace across pods
+  selector:
+    matchLabels: { app: token-workbench }
+  template:
+    metadata:
+      labels: { app: token-workbench }
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        seccompProfile: { type: RuntimeDefault }
+      containers:
+        - name: app
+          image: __IMAGE__
+          imagePullPolicy: IfNotPresent
+          ports:
+            - { name: http, containerPort: 5910 }
+          env:
+            - { name: MODE, value: se-mock }
+            - { name: TW_PORT, value: "5910" }
+            - { name: TW_BIND, value: 0.0.0.0 }
+            - { name: TW_PUBLIC_ORIGIN, value: "https://__SE_HOST__" }
+          readinessProbe:
+            httpGet: { path: /api/health, port: http, httpHeaders: [{ name: Host, value: "127.0.0.1:5910" }] }
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: { path: /api/health, port: http, httpHeaders: [{ name: Host, value: "127.0.0.1:5910" }] }
+            initialDelaySeconds: 10
+            periodSeconds: 20
+          resources:
+            requests: { cpu: 100m, memory: 128Mi }
+            limits: { cpu: 500m, memory: 384Mi }
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: ["ALL"] }
+          volumeMounts:
+            - { name: tmp, mountPath: /tmp }
+      volumes:
+        - { name: tmp, emptyDir: { sizeLimit: 16Mi } }

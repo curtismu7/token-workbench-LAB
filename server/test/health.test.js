@@ -8,9 +8,13 @@ import { freeBase, request } from './helpers.js';
 async function serve(t, health) {
   const app = express();
   app.use('/api/health', health.router);
-  const port = await freeBase('misc', 1);
-  const s = app.listen(port, '127.0.0.1');
-  await new Promise((r) => s.once('listening', r));
+  // Test files run in parallel processes: another one can take the port between the check and the bind, so retry.
+  let port; let s;
+  for (let attempt = 0; ; attempt += 1) {
+    port = await freeBase('misc', 1);
+    s = app.listen(port, '127.0.0.1');
+    try { await new Promise((resolve, reject) => { s.once('listening', resolve); s.once('error', reject); }); break; } catch (e) { if (e.code !== 'EADDRINUSE' || attempt >= 5) throw e; }
+  }
   t.after(() => { health.stop(); s.closeAllConnections(); s.close(); });
   return port;
 }

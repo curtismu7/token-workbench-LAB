@@ -1,0 +1,16 @@
+# The host is supplied by k8s/deploy.sh from SE_HOST (an SE-cluster host the owner names). There is deliberately no default.
+# The app accepts loopback Host headers only, so the ingress rewrites the Host header to 127.0.0.1:5910 for the pod
+# (the nginx annotation below). The browser's Origin (https://SE_HOST) is accepted through TW_PUBLIC_ORIGIN.
+# Ingress class and TLS are owner decisions for the SE cluster (UNVERIFIED): add them when the first deploy is approved.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: token-workbench
+  annotations:
+    nginx.ingress.kubernetes.io/upstream-vhost: "127.0.0.1:5910"
+spec:
+  rules:
+    - host: __SE_HOST__
+      http:
+        paths:
+          - { path: /, pathType: Prefix, backend: { service: { name: token-workbench, port: { name: http } } } }

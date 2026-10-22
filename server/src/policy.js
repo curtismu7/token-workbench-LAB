@@ -14,6 +14,7 @@ export function evaluateTarget(target) {
 }
 
 export const REFUSAL_TEXT = {
+  hosted_build: 'this hosted demo checks its built-in stub servers only; run the standalone build to point the checker at a loopback server of your own',
   invalid_url: 'not a valid URL',
   unsupported_scheme: 'only http:// loopback targets are allowed',
   credentials_not_allowed: 'a URL with a user name or password is refused',

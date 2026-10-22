@@ -82,6 +82,9 @@ The stub resource server and issuer is on 5916 (`POST /mcp`, `GET /.well-known/o
 | `TW_PORT` | `5910` | API port; must be in 5900-5999. |
 | `TW_BIND` | unset | Bind address. Unset means `127.0.0.1`. The container sets `0.0.0.0` and publishes on loopback only. |
 
+| `MODE` | `local` | `local` (the standalone) or `se-mock` (the hosted, simulated build for the SE k8s cluster, see below). Anything else stops startup. |
+| `TW_PUBLIC_ORIGIN` | unset | se-mock only: the one https origin of the hosted build, accepted for POSTs behind the ingress. |
+
 There is no live mode and no setting that changes where the tools connect. A `.env` file at the repo root is read for local runs (never commit it).
 
 ## Docker
@@ -102,4 +105,8 @@ npm run content-pack    # regenerates content-pack.json from content/ and valida
 
 `docs/shelf-entry.json` is an entry for the demo shelf registry (port 5910, `/api/health`). `scripts/lib/shelf-registry-rules.mjs` is a copy of the shelf's validation rules, tested in `scripts/shelf-entry.test.mjs`; the shelf's own `validateDemos` was also run once, read-only, against the file. The catalog id is **C2** because the shelf accepts one id per demo and C2 is the wave-1 row (kind `Demo`); this app also covers C20 (profile checker) and C23 (wrong-token tester), whose "planned" cards will stay on the shelf. Edit `composeFile` to your checkout's absolute path before adding it to `.data/demos.local.json`.
 
-More: [docs/safety.md](docs/safety.md), [docs/architecture.md](docs/architecture.md), [CHANGELOG.md](CHANGELOG.md). MIT licensed.
+## Hosted mock build for the SE cluster (rule 18)
+
+The same image runs as a mock-only hosted build with `MODE=se-mock`: every visitor gets a private in-memory workspace (header `X-Workspace-Id`, capped and evicted after idling), the profile checker accepts the built-in stubs only (a typed target is refused), a live flag in the environment stops startup, and the UI shows a "HOSTED SIMULATION" banner on every tab. Manifests and the deploy script are in `k8s/`; nothing has been deployed, and the first deploy needs the owner's approval (`k8s/deploy.sh --dry-run` renders, `--apply` needs `OWNER_APPROVED=1`). Full details, the state inventory and residual risks: [docs/k8s.md](docs/k8s.md).
+
+More: [docs/k8s.md](docs/k8s.md), [docs/safety.md](docs/safety.md), [docs/architecture.md](docs/architecture.md), [CHANGELOG.md](CHANGELOG.md). MIT licensed.

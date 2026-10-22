@@ -62,5 +62,5 @@ export async function startTestApp(slice, opts = {}) {
     base = await freeBase(slice, 7);
     try { app = await startHttpServer({ port: base, stubBase: base + 1, ...opts }); break; } catch (e) { if (e.code !== 'EADDRINUSE' || attempt >= 5) throw e; }
   }
-  return { port: app.port, runtime: app.runtime, base, close: app.close, post: (p, body, o) => request(app.port, 'POST', p, { body, ...o }), get: (p, o) => request(app.port, 'GET', p, o) };
+  return { port: app.port, runtime: app.runtime, workspaces: app.workspaces, base, close: app.close, post: (p, body, o) => request(app.port, 'POST', p, { body, ...o }), get: (p, o) => request(app.port, 'GET', p, o) };
 }
