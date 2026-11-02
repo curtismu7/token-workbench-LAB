@@ -85,6 +85,17 @@ export function createApp({ runtime, health = createHealth(), webDist = DEFAULT_
     profiles: PROFILE_ORDER.map((id) => ({ id, title: PROFILES[id].title, blurb: PROFILES[id].blurb, url: req.rt.authServers[id].url })),
     rules: { bcp: BCP_RULES.map(({ id, title, rfc }) => ({ id, title, rfc })), fapi: FAPI_RULES.map(({ id, title, rfc }) => ({ id, title, rfc })), fapiNote: FAPI_NOTE, bcpNote: BCP_NOTE },
   }));
+  // Rule 19: the Mock/Real toggle's API. This app is mock only (stub servers on loopback, no tenant, no network), so Real is never available.
+  const NO_REAL = 'Real is not available: this app has no live version (stub servers on loopback, no tenant, no network). Mock is the whole workbench.';
+  const infoBody = () => ({ mode: deployMode, hosted, source: 'mock', realAvailable: false });
+  api.get('/info', (_req, res) => res.json(infoBody()));
+  api.post('/mode', (req, res) => {
+    const b = req.body;
+    if (b === null || typeof b !== 'object' || Array.isArray(b) || Object.keys(b).length !== 1 || !['mock', 'real'].includes(b.source)) return bad(res, 'body must be exactly {source: "mock" or "real"}');
+    if (hosted) return bad(res, 'The hosted build is Mock only and cannot be switched.', 403);
+    if (b.source === 'real') return bad(res, NO_REAL, 409);
+    return res.json(infoBody());
+  });
   api.get('/jwks', (req, res) => res.json(req.rt.keyring.jwks()));
 
   // --- decode / mint ---
