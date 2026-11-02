@@ -188,8 +188,8 @@ describe("flow catalog tab", () => {
 });
 
 describe("theme tokens", () => {
-  it("use no purple: every hex colour in app.css has a hue outside 255-320 degrees (or is grey)", () => {
-    const css = fs.readFileSync(path.resolve(__dirname, "app.css"), "utf8");
+  it("use no purple: every hex colour in the shared stylesheet and app.css has a hue outside 255-320 degrees (or is grey)", () => {
+    const css = ["standalone-ui.css", "app.css"].map((f) => fs.readFileSync(path.resolve(__dirname, f), "utf8")).join("\n");
     const hexes = [...new Set(css.match(/#[0-9a-f]{6}\b/gi))];
     expect(hexes.length).toBeGreaterThan(10);
     for (const h of hexes) {
