@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from "react";
-import { getHealth, getMeta } from "./lib/api.js";
+import { getHealth, getInfo, getMeta, setMode } from "./lib/api.js";
 import Decode from "./components/Decode.jsx";
 import Tester from "./components/Tester.jsx";
 import Checker from "./components/Checker.jsx";
 import Flows from "./components/Flows.jsx";
 import Story from "./components/Story.jsx";
+import ModeToggle from "./components/ModeToggle.jsx";
 
 const safe = (fn, fallback) => { try { return fn(); } catch { return fallback; } };
 const initialTheme = () => safe(() => localStorage.getItem("tw-theme"), null)
@@ -18,6 +19,7 @@ export default function App() {
   const [health, setHealth] = useState(null);
   const [message, setMessage] = useState("");
   const [hostedBanner, setHostedBanner] = useState(null);
+  const [info, setInfo] = useState(null);
 
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", theme);
@@ -26,6 +28,11 @@ export default function App() {
   // The hosted build (MODE=se-mock) serves its banner text in /api/meta; the local build serves none.
   useEffect(() => { getMeta().then((m) => setHostedBanner(m?.hosted && typeof m.banner === "string" ? m.banner : null), () => {}); }, []);
   useEffect(() => { getHealth().then(setHealth, () => setHealth({ unreachable: true })); }, []);
+  useEffect(() => { getInfo().then(setInfo, () => {}); }, []);
+  // Rule 19: the Mock/Real toggle. A switch is announced and the server's answer is what the toggle shows.
+  const onSelectMode = async (source) => {
+    try { setInfo(await setMode(source)); setMessage(`Mode: ${source === "real" ? "Real" : "Mock"}.`); } catch (e) { setMessage(e.message); }
+  };
 
   const dark = theme === "dark";
   return (
@@ -37,6 +44,7 @@ export default function App() {
       <header className="top">
         <h1>Token Workbench</h1>
         <span className="mode mode--demo" data-testid="mode-badge">DEMO<span className="sr-only">: stub servers on loopback, nothing real is contacted</span></span>
+        <ModeToggle info={info} onSelect={onSelectMode} />
         <nav aria-label="Tools">
           {TABS.map(([id, label]) => (
             <button key={id} type="button" className="tab" aria-pressed={tab === id} onClick={() => { setTab(id); setMessage(""); }}>{label}</button>
