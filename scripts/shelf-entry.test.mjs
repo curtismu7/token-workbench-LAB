@@ -22,6 +22,6 @@ test('the entry matches this app: id, port 5910, /api/health, compose file name'
 });
 
 test('the copied rules reject a bad entry', () => {
-  const bad = [{ ...entry.demos[0], url: 'http://evil.example:5910', healthPath: '//x', composeFile: 'relative.yml' }];
+  const bad = [{ ...entry.demos[0], url: 'http://evil.example:5910', healthPath: '//x', composeFile: '../relative.yml' }];
   assert.ok(shelfProblems(bad).length >= 3);
 });
