@@ -190,12 +190,13 @@ describe("accessibility behaviour", () => {
 });
 
 describe("colour contrast", () => {
-  const css = fs.readFileSync(path.resolve(__dirname, "app.css"), "utf8");
+  const css = fs.readFileSync(path.resolve(__dirname, "standalone-ui.css"), "utf8");
   const block = (re) => Object.fromEntries([...css.match(re)[1].matchAll(/--([\w-]+):\s*(#[0-9a-f]{6})/gi)].map((m) => [m[1], m[2]]));
-  const themes = { light: block(/:root \{([^}]*)\}/), dark: block(/:root\[data-theme="dark"\] \{([^}]*)\}/) };
+  const light = block(/:root \{([^}]*)\}/);
+  const themes = { light, dark: { ...light, ...block(/:root\[data-theme="dark"\] \{([^}]*)\}/) } };
   const lum = (h) => { const c = [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16) / 255).map((x) => (x <= 0.03928 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4)); return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]; };
   const ratio = (a, b) => { const [x, y] = [lum(a), lum(b)].sort((p, q) => q - p); return (x + 0.05) / (y + 0.05); };
-  const PAIRS = [["ok", "ok-wash"], ["hold", "hold-wash"], ["deny", "deny-wash"], ["info", "info-wash"], ["mute", "mute-wash"], ["text", "bg"], ["text", "card"], ["muted", "bg"], ["muted", "card"], ["on-accent", "accent"], ["accent", "card"], ["mark-text", "mark"], ["ok", "card"], ["deny", "card"], ["hold", "bg"]];
+  const PAIRS = [["status-ok", "surface-2"], ["status-warn", "surface-2"], ["danger-text", "accent-soft"], ["status-info", "surface-2"], ["muted", "surface-2"], ["text", "bg"], ["text", "surface"], ["muted", "bg"], ["muted", "surface"], ["on-accent", "accent"], ["on-box", "box-dark"], ["on-box", "box-red"], ["status-ok", "surface"], ["danger-text", "surface"], ["status-warn", "bg"], ["status-info", "surface"]];
   for (const [name, t] of Object.entries(themes)) {
     it(`${name} theme: every text/background pair meets WCAG AA (4.5:1)`, () => {
       for (const [fg, bg] of PAIRS) expect(ratio(t[fg], t[bg]), `${name} --${fg} on --${bg}`).toBeGreaterThanOrEqual(4.5);
