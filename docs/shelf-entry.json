@@ -8,7 +8,7 @@
       "description": "Mock-only token workbench: decode and trace a token, test wrong-token rejection, check stub authorization servers against OAuth rules (FAPI 2.0 pack UNVERIFIED), compare PAR/RAR/DPoP/mTLS/JAR/PKCE (simulation).",
       "url": "http://localhost:5910",
       "healthPath": "/api/health",
-      "composeFile": "/Users/cmuir/Development/token-workbench/docker-compose.yml",
+      "composeFile": "token-workbench-LAB/docker-compose.yml",
       "composeOverlays": [],
       "notes": "Merges plan items C2 (token-flow comparison), C20 (OAuth profile checker) and C23 (wrong-token tester); the shelf takes one catalogId per demo, so C2 is used and the C20 and C23 'planned' cards stay. Host-run: npm install && npm run build && npm start (port 5910; npm run doctor checks it; stubs need 5911-5916). Or: docker compose up --build -d (publishes 127.0.0.1:5910 only; HOST_PORT changes it, and the shelf's Start button does not set HOST_PORT). Edit composeFile to this checkout's absolute path."
     }
