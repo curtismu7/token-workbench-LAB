@@ -46,6 +46,12 @@ export function createWorkspaces({ defaultRuntime, create, max = MAX_WORKSPACES,
       return entry.runtime;
     },
     sweep,
+    /** Close and remove one workspace's runtime (rule 3 reset). The default is never dropped here. */
+    dropForReset(id) {
+      if (id === DEFAULT_WORKSPACE || !map.has(id)) return false;
+      drop(id);
+      return true;
+    },
     get size() { return map.size; },
     ids: () => [...map.keys()],
     async closeAll() {
