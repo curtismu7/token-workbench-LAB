@@ -1,6 +1,8 @@
 import React from "react";
 
 // What each tab proves, in presenter words. Every claim is something the server does (docs/architecture.md).
+// What each tab proves. Fixed text: this workbench has one cast and no vertical packs, so the story
+// system (the {{cast.*}} token family with a vertical supplying names, as in the sibling demos) is not wired in.
 export const STORY = [
   { id: "decode", title: "1. Read", proves: "A token is only text. Decoding shows what it says, offline. Anyone can write any claims, so nothing is trusted until the signature is checked." },
   { id: "tester", title: "2. Break", proves: "Fifteen wrong tokens are sent to a stub resource server. A correct one refuses each for the right reason, with the right error." },
