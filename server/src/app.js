@@ -8,6 +8,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createHealth } from './health.js';
 import { createRuntime } from './runtime.js';
+import { loadCustomer, DEFAULT_CUSTOMER } from './customer.js';
 import { assertBindAllowed, bindHost, credentialGuard, hostGuard, makeOriginGuard, serverPort } from './safety.js';
 import { bannerText, liveFlagProblems, modeFrom, publicOriginFrom } from './config.js';
 import { DEFAULT_WORKSPACE, WORKSPACE_RE, createWorkspaces } from './workspaces.js';
@@ -49,7 +50,7 @@ const SAMPLES = {
 // webDist: directory with the built UI (web/dist). null disables static serving; a missing directory serves JSON 404 at /.
 // deployMode 'local' (default): one runtime, the X-Workspace-Id header is ignored. 'se-mock': one runtime per workspace id
 // (workspaces.js), user-typed checker targets refused. createWorkspaceRuntime builds the runtime of a new workspace.
-export function createApp({ runtime, health = createHealth(), webDist = DEFAULT_WEB_DIST, deployMode = 'local', publicOrigin = null, workspaceOptions = {}, createWorkspaceRuntime = () => createRuntime({ ephemeral: true }) } = {}) {
+export function createApp({ runtime, health = createHealth(), webDist = DEFAULT_WEB_DIST, deployMode = 'local', publicOrigin = null, workspaceOptions = {}, createWorkspaceRuntime = () => createRuntime({ ephemeral: true }), customer = loadCustomer() } = {}) {
   const hosted = deployMode === 'se-mock';
   const workspaces = hosted ? createWorkspaces({ defaultRuntime: runtime, create: createWorkspaceRuntime, ...workspaceOptions }) : null;
   const app = express();
@@ -84,6 +85,7 @@ export function createApp({ runtime, health = createHealth(), webDist = DEFAULT_
     allowedAlgs: ALLOWED_ALGS, maxTokenChars: MAX_TOKEN_CHARS, ports: req.rt.ports,
     profiles: PROFILE_ORDER.map((id) => ({ id, title: PROFILES[id].title, blurb: PROFILES[id].blurb, url: req.rt.authServers[id].url })),
     rules: { bcp: BCP_RULES.map(({ id, title, rfc }) => ({ id, title, rfc })), fapi: FAPI_RULES.map(({ id, title, rfc }) => ({ id, title, rfc })), fapiNote: FAPI_NOTE, bcpNote: BCP_NOTE },
+    customer: { ...DEFAULT_CUSTOMER, ...customer },
   }));
   // Rule 19: the Mock/Real toggle's API. This app is mock only (stub servers on loopback, no tenant, no network), so Real is never available.
   const NO_REAL = 'Real is not available: this app has no live version (stub servers on loopback, no tenant, no network). Mock is the whole workbench.';
@@ -96,6 +98,18 @@ export function createApp({ runtime, health = createHealth(), webDist = DEFAULT_
     if (b.source === 'real') return bad(res, NO_REAL, 409);
     return res.json(infoBody());
   });
+
+  // Reset (rule 3): POST /api/reset drops every non-default workspace runtime and stops
+  // the default's stub servers' in-flight state. The fixtures are static data.
+  api.post('/reset', wrap(async (req, res) => {
+    if (workspaces && req.workspaceId === DEFAULT_WORKSPACE) {
+      const ids = workspaces.ids().filter((id) => id !== DEFAULT_WORKSPACE);
+      for (const id of ids) workspaces.dropForReset(id);
+      res.json({ ok: true, cleared: ids.length, note: 'workspaces beyond the default are closed; the fixtures never change' });
+    } else {
+      res.json({ ok: true, cleared: 0, note: 'hosted builds scope reset to the default workspace only' });
+    }
+  }));
   api.get('/jwks', (req, res) => res.json(req.rt.keyring.jwks()));
 
   // --- decode / mint ---
