@@ -9,6 +9,7 @@ services:
     ports:
       - "127.0.0.1:${HOST_PORT:-5910}:5910"
     environment:
+      SHELF_URL: ${SHELF_URL:-}
       TW_PORT: "5910"
       TW_BIND: 0.0.0.0
     read_only: true
