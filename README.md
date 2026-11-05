@@ -4,7 +4,7 @@ Tier: Demo.
 
 A mock-only workbench for OAuth and JWT tokens. It decodes and explains a token offline, tests what a resource server does when it is sent the wrong token, checks stub authorization servers against OAuth security rules, and compares PAR, RAR, DPoP, mTLS, JAR and PKCE with and without the protection.
 
-Repo: https://github.com/ping-sandbox/token-workbench-LAB
+Repo: https://github.com/curtismu7/token-workbench-LAB
 
 Everything runs against stubs inside this process, on loopback. Nothing real is contacted: no tenant, no real authorization server, no network.
 
