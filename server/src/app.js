@@ -21,6 +21,7 @@ import { compare, listMechanisms, runFlow } from './catalog.js';
 import { TargetRefused } from './http.js';
 import { evaluateTarget } from './policy.js';
 import { ALLOWED_ALGS } from './validator.js';
+import { shelfInfo } from './shelfLink.js';
 
 const wrap = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
 const bad = (res, message, status = 400, error) => res.status(status).json({ error: error || (status === 404 ? 'not_found' : 'bad_request'), message });
@@ -60,6 +61,7 @@ export function createApp({ runtime, health = createHealth(), webDist = DEFAULT_
   app.use(makeOriginGuard(publicOrigin));
   app.use((_req, res, next) => { res.set(API_HEADERS); next(); });
   if (webDist && fs.existsSync(path.join(webDist, 'index.html'))) {
+app.get('/api/shelf', (_req, res) => { res.set('Cache-Control', 'no-store'); res.json(shelfInfo()); }); // the header "Shelf" button
     app.use(express.static(webDist, {
       index: 'index.html', dotfiles: 'ignore',
       setHeaders: (res) => res.set({ ...API_HEADERS, 'Content-Security-Policy': UI_CSP }),

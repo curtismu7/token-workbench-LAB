@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import ShelfLink from "./components/ShelfLink.jsx";
 import { getHealth, getInfo, getMeta, setMode } from "./lib/api.js";
 import Decode from "./components/Decode.jsx";
 import Tester from "./components/Tester.jsx";
@@ -43,6 +44,7 @@ export default function App() {
       {hostedBanner && <div className="banner hosted" role="note" data-testid="hosted-banner">{hostedBanner}</div>}
       <header className="top">
         <h1>Token Workbench</h1>
+        <ShelfLink />
         <span className="mode mode--demo" data-testid="mode-badge">DEMO<span className="sr-only">: stub servers on loopback, nothing real is contacted</span></span>
         <ModeToggle info={info} onSelect={onSelectMode} />
         <nav aria-label="Tools">
