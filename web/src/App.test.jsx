@@ -27,12 +27,16 @@ describe("shell", () => {
     expect(screen.getByRole("button", { name: "Profile checker" })).toHaveAttribute("aria-pressed", "true");
   });
 
-  it("toggles dark and light on the document element", async () => {
+  it("sets dark and light on the document element via the theme select", async () => {
     stubFetch(base);
     render(<App />);
-    const before = document.documentElement.dataset.theme;
-    await userEvent.click(screen.getByRole("button", { name: /switch to (dark|light) theme/i }));
-    expect(document.documentElement.dataset.theme).not.toBe(before);
+    const select = screen.getByTestId("theme");
+    await userEvent.selectOptions(select, "dark");
+    expect(document.documentElement.dataset.theme).toBe("dark");
+    await userEvent.selectOptions(select, "auto");
+    expect(document.documentElement.dataset.theme).toBeUndefined();
+    await userEvent.selectOptions(select, "light");
+    expect(document.documentElement.dataset.theme).toBe("light");
   });
 
   it("warns when the API is unreachable", async () => {

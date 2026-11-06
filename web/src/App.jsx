@@ -10,8 +10,10 @@ import ModeToggle from "./components/ModeToggle.jsx";
 import { workspaceId } from "./lib/api.js";
 
 const safe = (fn, fallback) => { try { return fn(); } catch { return fallback; } };
-const initialTheme = () => safe(() => localStorage.getItem("tw-theme"), null)
-  || (safe(() => window.matchMedia("(prefers-color-scheme: dark)").matches, false) ? "dark" : "light");
+const initialTheme = () => {
+  const t = safe(() => localStorage.getItem("tw-theme"), null);
+  return ["auto", "light", "dark"].includes(t) ? t : "auto";
+};
 
 export const TABS = [["decode", "Decode / Trace"], ["tester", "Wrong-token tester"], ["checker", "Profile checker"], ["flows", "Flow catalog"]];
 
@@ -24,7 +26,8 @@ export default function App() {
   const [info, setInfo] = useState(null);
 
   useEffect(() => {
-    document.documentElement.setAttribute("data-theme", theme);
+    if (theme === "auto") document.documentElement.removeAttribute("data-theme");
+    else document.documentElement.setAttribute("data-theme", theme);
     safe(() => localStorage.setItem("tw-theme", theme));
   }, [theme]);
   // The hosted build (MODE=se-mock) serves its banner text in /api/meta; the local build serves none.
@@ -36,7 +39,6 @@ export default function App() {
     try { setInfo(await setMode(source)); setMessage(`Mode: ${source === "real" ? "Real" : "Mock"}.`); } catch (e) { setMessage(e.message); }
   };
 
-  const dark = theme === "dark";
   return (
     <>
       <a className="skip" href="#main" onClick={(e) => { e.preventDefault(); document.getElementById("main")?.focus(); }}>Skip to content</a>
@@ -53,7 +55,13 @@ export default function App() {
             <button key={id} type="button" className="tab" aria-pressed={tab === id} onClick={() => { setTab(id); setMessage(""); }}>{label}</button>
           ))}
         </nav>
-        <button type="button" className="btn" onClick={() => setTheme(dark ? "light" : "dark")} aria-label={`Switch to ${dark ? "light" : "dark"} theme`}>{dark ? "Light" : "Dark"}</button>
+        <label className="inline">Theme
+          <select value={theme} onChange={(e) => setTheme(e.target.value)} data-testid="theme">
+            <option value="auto">Auto</option>
+            <option value="light">Light</option>
+            <option value="dark">Dark</option>
+          </select>
+        </label>
       </header>
       <main id="main" tabIndex={-1} className="page">
         <div role="status" aria-live="polite" className="live" data-testid="live">{message}</div>
