@@ -31,6 +31,15 @@ export function publicOriginFrom(env = process.env) {
   return u.origin;
 }
 
+// Extra Host names this app answers to (family standard): LAB_ALLOWED_HOSTS, comma separated host names that point at this Mac,
+// such as the lab-proxy's token-workbench.local.ping-devops.com. Loopback always works; unset = loopback only.
+const HOSTNAME = /^(?=.{1,253}$)[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)*$/i;
+export function allowedHostsFrom(env = process.env) {
+  const names = String(env.LAB_ALLOWED_HOSTS || '').split(',').map((h) => h.trim().toLowerCase()).filter(Boolean);
+  for (const h of names) if (!HOSTNAME.test(h)) throw new Error(`LAB_ALLOWED_HOSTS: not a host name: ${h}`);
+  return new Set(names);
+}
+
 export const bannerText = (mode) => (mode === 'se-mock'
   ? 'HOSTED SIMULATION: this is a shared hosted demo. Every stub server, key and token here is simulated and lives in memory in the server, private to your browser tab. Nothing real is contacted and you cannot point it at anything.'
   : null);

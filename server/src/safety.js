@@ -2,7 +2,7 @@
 //  1. Bind loopback only, unless TW_BIND opts in (the container does).
 //  2. Every port this app uses is in 5900-5999.
 //  3. Mock only: there is no live mode. Stubs and the HTTP client are loopback-only.
-//  4. Only loopback hosts are Host-header-accepted; no credential header is accepted.
+//  4. Only loopback hosts are Host-header-accepted, plus the names in LAB_ALLOWED_HOSTS (the lab-proxy's name for this app); no credential header is accepted.
 
 export const SERVER_PORT = 5910;
 export const STUB_BASE_PORT = 5911; // 5911-5915 authorization-server profiles, 5916 resource server + issuer
@@ -33,15 +33,19 @@ export function parseHost(hostHeader) {
   return { hostname: m[1].toLowerCase().replace(/^\[|\]$/g, ''), port: m[2] === undefined ? null : Number(m[2]), host: `${m[1]}${m[2] === undefined ? '' : `:${m[2]}`}`.toLowerCase() };
 }
 
-// Rejects a missing, malformed or non-loopback Host header (DNS rebinding): 421 Misdirected Request.
-export function hostGuard(req, res, next) {
-  // Exactly one Host header, an origin-form request target ("/path", not "http://evil.com/path"), and a loopback Host.
+// Rejects a missing, malformed or non-loopback Host header (DNS rebinding): 421 Misdirected Request. `extra` is the set of host
+// names (no port, lower case) the lab-proxy sends in Host, from LAB_ALLOWED_HOSTS; loopback always works.
+const hostName = (hostHeader) => String(hostHeader ?? '').trim().toLowerCase().replace(/:\d{1,5}$/, '');
+export const makeHostGuard = (extra = new Set()) => function hostGuard(req, res, next) {
+  // Exactly one Host header, an origin-form request target ("/path", not "http://evil.com/path"), and a loopback or allowed Host.
   const hostCount = req.rawHeaders.filter((h, i) => i % 2 === 0 && h.toLowerCase() === 'host').length;
-  if (hostCount !== 1 || !String(req.url).startsWith('/') || !req.headers.host || !parseHost(req.headers.host)) {
+  const hostOk = req.headers.host && (parseHost(req.headers.host) || extra.has(hostName(req.headers.host)));
+  if (hostCount !== 1 || !String(req.url).startsWith('/') || !hostOk) {
     return res.status(421).json({ error: 'bad_host', message: 'this server answers loopback Host headers only' });
   }
   return next();
-}
+};
+export const hostGuard = makeHostGuard();
 
 // CSRF defence for anything that is not a plain read. A browser page on another site can send a "simple" POST to
 // 127.0.0.1 without CORS permission, so the server must refuse it itself:
@@ -49,7 +53,7 @@ export function hostGuard(req, res, next) {
 //  - an Origin header must be an http loopback origin identical to the Host the request was sent to;
 //  - a request with a body must be application/json.
 const READ_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
-export const makeOriginGuard = (publicOrigin = null) => function originGuard(req, res, next) {
+export const makeOriginGuard = (publicOrigin = null, extraHosts = new Set()) => function originGuard(req, res, next) {
   if (READ_METHODS.has(req.method)) return next();
   const refuse = (status, error, message) => res.status(status).json({ error, message });
   if (String(req.headers['sec-fetch-site'] || '').toLowerCase() === 'cross-site') return refuse(403, 'cross_site_refused', 'cross-site requests are refused');
@@ -59,7 +63,13 @@ export const makeOriginGuard = (publicOrigin = null) => function originGuard(req
     try { u = new URL(origin); } catch { /* refused below */ }
     const host = parseHost(req.headers.host);
     const isPublic = publicOrigin !== null && origin === publicOrigin; // hosted build: the ingress rewrote Host to loopback
-    const same = isPublic || u && u.protocol === 'http:' && u.origin !== 'null' && isLoopbackHost(u.hostname) && host
+    // Behind the lab-proxy the browser's origin is https://local.ping-devops.com:8443 while Host is this app's own name. The proxy
+    // sets X-Forwarded-Host/-Proto; they are believed only when Host is one of the allowed names, so a request that did not come
+    // through the proxy cannot use them.
+    const xfh = String(req.headers['x-forwarded-host'] || '').toLowerCase();
+    const xfp = String(req.headers['x-forwarded-proto'] || 'https').toLowerCase();
+    const proxied = extraHosts.has(hostName(req.headers.host)) && xfh !== '' && (xfp === 'https' || xfp === 'http') && origin === `${xfp}://${xfh}`;
+    const same = isPublic || proxied || u && u.protocol === 'http:' && u.origin !== 'null' && isLoopbackHost(u.hostname) && host
       && u.host.toLowerCase() === host.host && !u.username && !u.password && u.pathname === '/' && origin === u.origin;
     if (!same) return refuse(403, 'bad_origin', 'this server accepts same-origin loopback requests only');
   }

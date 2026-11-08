@@ -58,6 +58,46 @@ test('CSRF: a cross-origin or cross-site POST is refused, same-origin is accepte
   assert.equal(app.runtime.rs.stats.requests, before);
 });
 
+test('LAB_ALLOWED_HOSTS: the lab-proxy name is served on any port, other names stay 421, a bad name refuses to start', async (t) => {
+  const app = await startTestApp('safety', { env: { LAB_ALLOWED_HOSTS: 'token-workbench.local.ping-devops.com, Other.Example' } }); t.after(app.close);
+  for (const host of ['token-workbench.local.ping-devops.com:5910', 'token-workbench.local.ping-devops.com', 'other.example', 'OTHER.example:8443']) {
+    assert.equal((await request(app.port, 'GET', '/api/health', { host })).status, 200, host);
+  }
+  for (const host of ['evil.example.com', 'token-workbench.local.ping-devops.com.evil.com', 'xtoken-workbench.local.ping-devops.com', 'local.ping-devops.com:8443']) {
+    assert.equal((await request(app.port, 'GET', '/api/health', { host })).status, 421, host);
+  }
+  await assert.rejects(startHttpServer({ port: await freeBase('safety', 2), env: { LAB_ALLOWED_HOSTS: 'not a host name' } }), /LAB_ALLOWED_HOSTS: not a host name/);
+  // unset: the default stays loopback only
+  const plain = await startTestApp('safety'); t.after(plain.close);
+  assert.equal((await request(plain.port, 'GET', '/api/health', { host: 'token-workbench.local.ping-devops.com:5910' })).status, 421);
+});
+
+test('behind the lab-proxy: a write is accepted only with the proxy\'s forwarded origin AND an allowed Host', async (t) => {
+  const app = await startTestApp('safety', { env: { LAB_ALLOWED_HOSTS: 'token-workbench.local.ping-devops.com' } }); t.after(app.close);
+  const proxyHost = 'token-workbench.local.ping-devops.com:5910';
+  const fwd = { 'x-forwarded-host': 'local.ping-devops.com:8443', 'x-forwarded-proto': 'https' };
+  const body = { sample: 'agent' };
+  const via = (headers) => request(app.port, 'POST', '/api/mint', { host: proxyHost, body, headers });
+  // what the browser and the proxy really send for a same-origin POST
+  assert.equal((await via({ ...fwd, origin: 'https://local.ping-devops.com:8443', 'sec-fetch-site': 'same-origin' })).status, 200);
+  assert.equal((await via({ ...fwd, origin: 'https://local.ping-devops.com:8443' })).status, 200);
+  // refused: a foreign origin, a mismatched forwarded host, a wrong scheme, a cross-site fetch, no forwarded host at all
+  for (const headers of [
+    { ...fwd, origin: 'https://evil.example.com' },
+    { ...fwd, origin: 'https://local.ping-devops.com:9999' },
+    { ...fwd, origin: 'http://local.ping-devops.com:8443' },
+    { ...fwd, origin: 'https://local.ping-devops.com:8443', 'sec-fetch-site': 'cross-site' },
+    { origin: 'https://local.ping-devops.com:8443' },
+    { 'x-forwarded-host': 'evil.example.com', 'x-forwarded-proto': 'https', origin: 'https://local.ping-devops.com:8443' },
+  ]) assert.equal((await via(headers)).status, 403, JSON.stringify(headers));
+  // the forwarded headers are not believed on a loopback Host: a page that did not come through the proxy cannot use them
+  const loop = await request(app.port, 'POST', '/api/mint', { host: `127.0.0.1:${app.port}`, body, headers: { ...fwd, origin: 'https://local.ping-devops.com:8443' } });
+  assert.equal(loop.status, 403);
+  // and without LAB_ALLOWED_HOSTS the same request is refused at the Host check
+  const plain = await startTestApp('safety'); t.after(plain.close);
+  assert.equal((await request(plain.port, 'POST', '/api/mint', { host: proxyHost, body, headers: { ...fwd, origin: 'https://local.ping-devops.com:8443' } })).status, 421);
+});
+
 test('a request body must be application/json (415), including text/plain "simple" requests', async (t) => {
   const app = await startTestApp('safety'); t.after(app.close);
   for (const ct of ['text/plain', 'application/x-www-form-urlencoded', 'multipart/form-data; boundary=x', 'application/jsonp']) {
