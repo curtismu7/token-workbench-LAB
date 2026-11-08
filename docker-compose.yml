@@ -9,7 +9,7 @@ services:
     ports:
       - "127.0.0.1:${HOST_PORT:-5910}:5910"
     environment:
-      SHELF_URL: ${SHELF_URL:-}
+      SHELF_URL: ${SHELF_URL:-http://127.0.0.1:4400}
       TW_PORT: "5910"
       TW_BIND: 0.0.0.0
       # The lab-proxy sends this name in Host (https://local.ping-devops.com:8443/token-workbench/). Loopback always works.
