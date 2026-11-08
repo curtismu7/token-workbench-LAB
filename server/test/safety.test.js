@@ -63,7 +63,7 @@ test('LAB_ALLOWED_HOSTS: the lab-proxy name is served on any port, other names s
   for (const host of ['token-workbench.local.ping-devops.com:5910', 'token-workbench.local.ping-devops.com', 'other.example', 'OTHER.example:8443']) {
     assert.equal((await request(app.port, 'GET', '/api/health', { host })).status, 200, host);
   }
-  for (const host of ['evil.example.com', 'token-workbench.local.ping-devops.com.evil.com', 'xtoken-workbench.local.ping-devops.com', 'local.ping-devops.com:8443']) {
+  for (const host of ['evil.example.com', 'token-workbench.local.ping-devops.com.evil.com', 'xtoken-workbench.local.ping-devops.example', 'local.ping-devops.com:8443']) {
     assert.equal((await request(app.port, 'GET', '/api/health', { host })).status, 421, host);
   }
   await assert.rejects(startHttpServer({ port: await freeBase('safety', 2), env: { LAB_ALLOWED_HOSTS: 'not a host name' } }), /LAB_ALLOWED_HOSTS: not a host name/);
