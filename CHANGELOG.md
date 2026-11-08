@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Behind the lab-proxy (https://local.ping-devops.com:8443/token-workbench/) every request got `bad_host`: Host checks allowed loopback only. New `LAB_ALLOWED_HOSTS` (family standard; compose defaults it to token-workbench.local.ping-devops.com): loopback always works, the listed names are also served. Writes from the proxy's origin are accepted only when Host is one of those names and the proxy's X-Forwarded-Host/-Proto match the browser's Origin; the forwarded headers are ignored on any other Host.
 - k8s: rule 18 mock-only SE build. `MODE=local|se-mock` on the same image; in se-mock every visitor has a private workspace (stub keys, five stub authorization servers, resource server, run queue; `X-Workspace-Id`, capped at 20, idle TTL 30 min, busy workspaces never evicted), typed checker targets and live flags are refused, `/api/meta` serves the HOSTED SIMULATION banner (shown on every tab) and health carries `mode`. `TW_PUBLIC_ORIGIN` accepts the ingress origin for POSTs. `k8s/` manifests (non-root, read-only root, drop ALL, probes, limits, 1 replica) and `deploy.sh` (`--dry-run` / `--apply` with `OWNER_APPROVED=1`), `docs/k8s.md`, tests. Local behaviour with `MODE` unset is unchanged. Not deployed.
 
 ## 0.1.0

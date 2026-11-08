@@ -9,8 +9,8 @@ import { fileURLToPath } from 'node:url';
 import { createHealth } from './health.js';
 import { createRuntime } from './runtime.js';
 import { loadCustomer, DEFAULT_CUSTOMER } from './customer.js';
-import { assertBindAllowed, bindHost, credentialGuard, hostGuard, makeOriginGuard, serverPort } from './safety.js';
-import { bannerText, liveFlagProblems, modeFrom, publicOriginFrom } from './config.js';
+import { assertBindAllowed, bindHost, credentialGuard, makeHostGuard, makeOriginGuard, serverPort } from './safety.js';
+import { allowedHostsFrom, bannerText, liveFlagProblems, modeFrom, publicOriginFrom } from './config.js';
 import { DEFAULT_WORKSPACE, WORKSPACE_RE, createWorkspaces } from './workspaces.js';
 import { explainClaims, parseJwt, timeStatus, verifyEs256, MAX_TOKEN_CHARS } from './jwt.js';
 import { inertValue, revealText } from './sanitize.js';
@@ -51,14 +51,14 @@ const SAMPLES = {
 // webDist: directory with the built UI (web/dist). null disables static serving; a missing directory serves JSON 404 at /.
 // deployMode 'local' (default): one runtime, the X-Workspace-Id header is ignored. 'se-mock': one runtime per workspace id
 // (workspaces.js), user-typed checker targets refused. createWorkspaceRuntime builds the runtime of a new workspace.
-export function createApp({ runtime, health = createHealth(), webDist = DEFAULT_WEB_DIST, deployMode = 'local', publicOrigin = null, workspaceOptions = {}, createWorkspaceRuntime = () => createRuntime({ ephemeral: true }), customer = loadCustomer() } = {}) {
+export function createApp({ runtime, health = createHealth(), webDist = DEFAULT_WEB_DIST, deployMode = 'local', publicOrigin = null, allowedHosts = new Set(), workspaceOptions = {}, createWorkspaceRuntime = () => createRuntime({ ephemeral: true }), customer = loadCustomer() } = {}) {
   const hosted = deployMode === 'se-mock';
   const workspaces = hosted ? createWorkspaces({ defaultRuntime: runtime, create: createWorkspaceRuntime, ...workspaceOptions }) : null;
   const app = express();
   app.workspaces = workspaces;
   app.disable('x-powered-by');
-  app.use(hostGuard);
-  app.use(makeOriginGuard(publicOrigin));
+  app.use(makeHostGuard(allowedHosts));
+  app.use(makeOriginGuard(publicOrigin, allowedHosts));
   app.use((_req, res, next) => { res.set(API_HEADERS); next(); });
   if (webDist && fs.existsSync(path.join(webDist, 'index.html'))) {
     app.use(express.static(webDist, {
@@ -208,10 +208,11 @@ export async function startHttpServer({ port = serverPort(), host = bindHost(), 
   const problems = liveFlagProblems(env);
   if (problems.length) throw new Error(`refusing to start: ${problems.join('; ')}`);
   const publicOrigin = deployMode === 'se-mock' ? publicOriginFrom(env) : null;
+  const allowedHosts = allowedHostsFrom(env); // before the stubs start: a bad name must not leave servers running
   const rt = runtime || await createRuntime({ stubBase });
   const health = createHealth({ env });
   return new Promise((resolve, reject) => {
-    const app = createApp({ runtime: rt, health, deployMode, publicOrigin, workspaceOptions, ...(webDist !== undefined ? { webDist } : {}) });
+    const app = createApp({ runtime: rt, health, deployMode, publicOrigin, allowedHosts, workspaceOptions, ...(webDist !== undefined ? { webDist } : {}) });
     const httpServer = app.listen(port, host);
     httpServer.once('error', async (e) => { health.stop(); await app.workspaces?.closeAll(); await rt.close(); reject(e); });
     httpServer.once('listening', () => {
