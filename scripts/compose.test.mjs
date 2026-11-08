@@ -85,3 +85,7 @@ test('the image runs on the documented port only (EXPOSE 5910, TW_PORT 5910)', (
   assert.match(df, /TW_PORT=5910/);
   assert.doesNotMatch(df, /EXPOSE (?!5910$)/m);
 });
+
+test('docker-compose.yml passes a usable SHELF_URL into the container (the shelf button needs it)', () => {
+  assert.match(compose, /^\s*SHELF_URL: \$\{SHELF_URL:-http:\/\/127\.0\.0\.1:4400\}\s*$/m);
+});
