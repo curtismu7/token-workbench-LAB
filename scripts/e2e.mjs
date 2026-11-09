@@ -156,7 +156,7 @@ try {
   await tab('Flow catalog').click();
 
   // Dark theme
-  await page.getByTestId('theme').selectOption('dark'); // the theme control is a select (Auto / Light / Dark)
+  await page.getByRole('button', { name: /Switch to dark theme/ }).click();
   check((await page.evaluate(() => document.documentElement.dataset.theme)) === 'dark', 'theme toggles to dark');
   await shot('5-flows-dark');
   await tab('Decode / Trace').click(); await shot('6-decode-dark');
