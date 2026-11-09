@@ -68,8 +68,8 @@
     },
     {
       "id": "mock-only",
-      "term": "Mock only",
-      "definition": "The only mode. The authorization-server stubs, the resource server and the issuer all run inside this process on loopback ports 5911-5916. The checker and tester accept loopback http targets only; there is no live mode, no tenant and no network."
+      "term": "Mock (the default)",
+      "definition": "The default mode. The authorization-server stubs, the resource server and the issuer all run inside this process on loopback ports 5911-5916. The checker and tester accept loopback http targets only; in Mock there is no live mode, no tenant and no network. Mock tokens are labelled MOCK."
     },
     {
       "id": "oauth-profile-checker",
@@ -90,6 +90,11 @@
       "id": "rar",
       "term": "RAR",
       "definition": "Rich Authorization Requests (RFC 9396): authorization_details describe exactly what is allowed (type, amount, recipient) instead of a broad scope. The resource server still has to compare each request with them."
+    },
+    {
+      "id": "real-mode",
+      "term": "Real (owner opt-in)",
+      "definition": "Off unless the owner sets TW_REAL=1 and the issuer and client settings in the lab's .env. Real gets a client_credentials token from one configured PingOne or PingFederate issuer, verifies against its JWKS, introspects, and judges its published metadata; every request is listed in a trace and goes to that issuer's origin only. Real tokens are labelled REAL; the client secret is never shown."
     },
     {
       "id": "rfc-9700-pack",
@@ -137,13 +142,14 @@
     {
       "id": "decode",
       "label": "Decode and trace a token",
-      "description": "Mint a sample token or paste one, read each claim in plain English, and check the signature against the stub keys.",
+      "description": "Mint a sample token or paste one, read each claim in plain English, check the signature and introspect it. Mock uses the stub keys; Real (owner opt-in) uses the configured issuer and lists every HTTP exchange.",
       "group": "try-it",
       "terms": [
         "decode-vs-verify",
         "audience",
         "sender-constrained-token",
-        "inert-text"
+        "inert-text",
+        "real-mode"
       ],
       "story": "S01",
       "action": {

@@ -1,6 +1,8 @@
 # OrbStack:  HOST_PORT=5910 docker compose up --build -d   ->  http://127.0.0.1:5910/api/health
 # The server binds 0.0.0.0 INSIDE the container (TW_BIND is the opt-in), but the port is published on loopback only.
-# Mock mode only: no host mounts, no docker socket, no host network. Do not change the 127.0.0.1 below.
+# No host mounts, no docker socket, no host network. Do not change the 127.0.0.1 below.
+# Mock by default. Real (owner opt-in) reads TW_REAL* from the .env file beside this compose file; with TW_REAL unset the
+# values below are empty and Real stays off. Real may reach only the configured issuer's origin (server/src/netguard.js).
 name: token-workbench
 
 services:
@@ -14,6 +16,13 @@ services:
       TW_BIND: 0.0.0.0
       # The lab-proxy sends this name in Host (https://local.ping-devops.com:8443/token-workbench/). Loopback always works.
       LAB_ALLOWED_HOSTS: ${LAB_ALLOWED_HOSTS:-token-workbench.local.ping-devops.com}
+      # Real mode (README "Real mode"). The secret is passed to the process only; it is never returned or logged.
+      TW_REAL: ${TW_REAL:-}
+      TW_REAL_ISSUER: ${TW_REAL_ISSUER:-}
+      TW_REAL_CLIENT_ID: ${TW_REAL_CLIENT_ID:-}
+      TW_REAL_CLIENT_SECRET: ${TW_REAL_CLIENT_SECRET:-}
+      TW_REAL_SCOPE: ${TW_REAL_SCOPE:-}
+      TW_REAL_TOKEN_AUTH: ${TW_REAL_TOKEN_AUTH:-}
     read_only: true
     cap_drop: [ALL]
     security_opt: ["no-new-privileges:true"]

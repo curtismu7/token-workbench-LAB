@@ -30,7 +30,10 @@ if (!fs.existsSync(path.join(root, 'web', 'dist', 'index.html'))) { console.erro
 const busy = [];
 for (let p = 5911; p <= 5916; p += 1) if (!await new Promise((res) => { const s = net.createServer(); s.once('error', () => res(false)); s.listen(p, '127.0.0.1', () => s.close(() => res(true))); })) busy.push(p);
 if (busy.length) { console.error(`stub port(s) ${busy.join(', ')} are in use (another token-workbench or e2e run?). Stop it and retry.`); process.exit(2); }
-const server = spawn(process.execPath, ['server/src/index.js'], { cwd: root, env: { ...process.env, TW_PORT: String(port) }, stdio: 'inherit' });
+// Mock only: any Real setting from the shell or the lab's .env is blanked (an empty value is not an opt-in and is not
+// overwritten by the .env file), so this run never contacts a real issuer.
+const realBlank = Object.fromEntries(['TW_REAL', 'TW_REAL_ISSUER', 'TW_REAL_CLIENT_ID', 'TW_REAL_CLIENT_SECRET', 'TW_REAL_SCOPE', 'TW_REAL_TOKEN_AUTH'].map((k) => [k, '']));
+const server = spawn(process.execPath, ['server/src/index.js'], { cwd: root, env: { ...process.env, ...realBlank, TW_PORT: String(port) }, stdio: 'inherit' });
 let up = false;
 for (let i = 0; i < 60 && !up; i++) { try { up = (await fetch(`${base}/api/health`)).ok; } catch { await sleep(250); } }
 if (!up) { server.kill(); console.error('server did not start'); process.exit(2); }
@@ -57,6 +60,14 @@ try {
   check(/default-src 'self'/.test(csp) && !/unsafe-eval/.test(csp), 'the UI is served with a same-origin CSP');
   await page.getByTestId('mode-badge').waitFor();
   check((await page.getByTestId('mode-badge').innerText()).includes('DEMO'), 'header shows the DEMO badge');
+  // Rule 19 without Real settings: MOCK banner first, Real disabled naming the settings, the "Real not configured" card.
+  check(await page.evaluate(() => document.querySelector('.banner')?.dataset.testid === 'mode-banner' && document.querySelector('.banner').textContent.startsWith('MOCK:')), 'the MOCK banner is the first banner');
+  await page.getByTestId('mode-mock').and(page.locator('[aria-pressed="true"]')).waitFor();
+  check(await page.getByTestId('mode-real').isDisabled(), 'Real is disabled without the owner\'s settings');
+  check(/TW_REAL_ISSUER/.test(await page.getByTestId('mode-real').getAttribute('title')), 'the Real button\'s tooltip names the settings');
+  await page.getByTestId('real-status').locator('summary').click();
+  const rs = await page.getByTestId('real-status').innerText();
+  check(/Real not configured/.test(rs) && /TW_REAL_CLIENT_SECRET/.test(rs) && /docker-compose\.yml/.test(rs), 'the "Real not configured" card lists the settings and where they go');
 
   // Keyboard only: skip link, then Tab through the four tabs and the theme button.
   await page.keyboard.press('Tab');
@@ -92,6 +103,11 @@ try {
   check((await page.locator('code', { hasText: '<img src=x' }).count()) > 0, 'the hostile string is visible as text');
   await page.getByRole('button', { name: 'DPoP-bound' }).click();
   await page.locator('.badge', { hasText: 'Signature valid (stub JWKS)' }).waitFor();
+  check((await page.getByTestId('token-label').innerText()) === 'MOCK', 'a minted stub token is labelled MOCK');
+  await page.getByRole('button', { name: 'Introspect (stub issuer)' }).click();
+  await page.getByTestId('introspect-result').waitFor();
+  const ir = await page.getByTestId('introspect-result').innerText();
+  check(/ACTIVE/.test(ir) && /MOCK/.test(ir) && !/NOT ACTIVE/.test(ir), 'mock introspection says ACTIVE and MOCK');
   await shot('1-decode-light');
 
   // 2. Wrong-token tester

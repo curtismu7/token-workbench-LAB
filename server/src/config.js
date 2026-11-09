@@ -3,13 +3,14 @@
 // In se-mock every live-ish feature is compiled out or refused: the checker accepts the per-workspace loopback stubs
 // only (no user-typed target), and a live flag in the environment stops the server from starting.
 export const MODES = ['local', 'se-mock'];
-// Names this app has never honoured. Setting one in se-mock is refused loudly so that a manifest edit cannot imply a
-// live capability that does not exist.
-export const REFUSED_LIVE_ENV = ['TW_LIVE', 'TW_ALLOW_REMOTE', 'TW_ALLOW_TARGETS', 'TW_CHECKER_TARGETS', 'LIVE'];
+// Names that are refused in se-mock, loudly, so that a manifest edit cannot imply a live capability there: names this app
+// has never honoured, and the Real-mode settings (Real exists only in the local standalone, real.js).
+export const REFUSED_LIVE_ENV = ['TW_LIVE', 'TW_ALLOW_REMOTE', 'TW_ALLOW_TARGETS', 'TW_CHECKER_TARGETS', 'LIVE',
+  'TW_REAL', 'TW_REAL_ISSUER', 'TW_REAL_CLIENT_ID', 'TW_REAL_CLIENT_SECRET', 'TW_REAL_SCOPE', 'TW_REAL_TOKEN_AUTH'];
 
 export function modeFrom(env = process.env) {
   const m = env.MODE === undefined || env.MODE === '' ? 'local' : env.MODE;
-  if (!MODES.includes(m)) throw new Error(`MODE=${String(m).replace(/[^\x20-\x7e]/g, '?').slice(0, 20)} is not available: use local or se-mock (there is no live mode)`);
+  if (!MODES.includes(m)) throw new Error(`MODE=${String(m).replace(/[^\x20-\x7e]/g, '?').slice(0, 20)} is not available: use local or se-mock (Real is a runtime toggle of the local build, not a MODE)`);
   return m;
 }
 

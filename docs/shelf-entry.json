@@ -5,7 +5,7 @@
       "name": "Token Workbench",
       "catalogId": "C2",
       "kind": "Demo",
-      "description": "Mock-only token workbench: decode and trace a token, test wrong-token rejection, check stub authorization servers against OAuth rules (FAPI 2.0 pack UNVERIFIED), compare PAR/RAR/DPoP/mTLS/JAR/PKCE (simulation).",
+      "description": "Token workbench, Mock with owner opt-in Real: decode, verify and introspect a token, test wrong-token rejection, check stub authorization servers against OAuth rules (FAPI 2.0 pack UNVERIFIED), compare PAR/RAR/DPoP/mTLS/JAR/PKCE (simulation).",
       "url": "http://localhost:5910",
       "healthPath": "/api/health",
       "composeFile": "token-workbench-LAB/docker-compose.yml",

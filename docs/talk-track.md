@@ -1,6 +1,6 @@
 # Talk track (4-6 minutes)
 
-Everything on screen is a stub running on this machine. Say so first.
+In Mock (the default) everything on screen is a stub running on this machine. Say so first, and point at the MOCK banner. If the owner turned Real on, the banner says REAL and names the one issuer it calls.
 
 ## Pitch (one sentence)
 
@@ -22,6 +22,16 @@ Run `npm run build` and `npm start`, open http://127.0.0.1:5910/. Check the head
 8. **Flow catalog tab.** Select **DPoP**, click **Simulate** with protection on, then untick **With DPoP** and Simulate again. Say: "Same stolen token, replayed. Without the binding the attack works; with it the proof is missing and the call is refused."
 9. **Same tab.** Drag a box, change the Speed, click **Reset**. Say: "Reset puts the diagram back." Mention the other mechanisms: PKCE, PAR, RAR, mTLS, JAR.
 
+## Real mode (owner only, when configured)
+
+Only if the owner set the `TW_REAL*` settings (README "Real mode"); otherwise the Real button is disabled and the "Real not configured" card lists what is needed. This is the hand-off for Customer Agent LAB's UC-LEARN17 (OAuth debug, live token flow log).
+
+10. **Header toggle: Real.** Say: "Now the same tab talks to one real issuer, and nothing else. The banner names it."
+11. **Decode / Trace: REAL client_credentials token.** Say: "That is a real access token, labelled REAL, shown raw because this is a debugging tool. Underneath is the trace: the discovery request and the token request exactly as sent and answered. The client secret never appears; it shows as write-only."
+12. **Tick Verify, Decode; then Introspect at the issuer.** Say: "Verified against the issuer's real JWKS, then the issuer itself says whether the token is active. Each step adds to the log."
+13. **Profile checker in Real.** Say: "One GET of the issuer's published metadata. A pass here means advertised, not enforced; rules that need crafted attack requests say NOT CHECKED, because we never send those to a real server."
+14. **Back to Mock.** Say: "And back to stubs, without a restart."
+
 ## If asked: what is honest
 
 - Simulated: the authorization servers, the resource server, the flows, the attacks. The keys and hashes are really computed in memory; nothing is sent over a network.
@@ -30,8 +40,8 @@ Run `npm run build` and `npm start`, open http://127.0.0.1:5910/. Check the head
 
 ## Likely questions
 
-1. **Does this touch my tenant or a real server?** No. There is no live mode; the checker accepts only a loopback URL you type.
-2. **Are the tokens real?** No. They are minted by a stub, labelled mock, and shown raw on purpose for education.
+1. **Does this touch my tenant or a real server?** Not in Mock: the checker accepts only a loopback URL you type. Real is off unless the owner configures one issuer, and then only that issuer's origin is reachable.
+2. **Are the tokens real?** In Mock, no: they are minted by a stub, labelled MOCK, and shown raw on purpose for education. In Real they are real tokens from the configured issuer, labelled REAL.
 3. **Can I point the checker at a real authorization server?** No, remote targets are refused. Only a local loopback server.
 4. **Does a pass here mean my server is compliant?** No. The BCP pack is a simplified check and the FAPI pack is UNVERIFIED.
 5. **Why DPoP or mTLS and not just short expiry?** Expiry limits how long a stolen token works; binding stops the thief from using it at all. The catalog shows both sides.

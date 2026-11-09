@@ -1,7 +1,8 @@
 // Safety rules. Pure functions, no I/O.
 //  1. Bind loopback only, unless TW_BIND opts in (the container does).
 //  2. Every port this app uses is in 5900-5999.
-//  3. Mock only: there is no live mode. Stubs and the HTTP client are loopback-only.
+//  3. Mock: stubs and the HTTP client (http.js) are loopback-only. Real (owner opt-in) goes through netguard.js to the
+//     configured issuer's origin only.
 //  4. Only loopback hosts are Host-header-accepted, plus the names in LAB_ALLOWED_HOSTS (the lab-proxy's name for this app); no credential header is accepted.
 
 export const SERVER_PORT = 5910;

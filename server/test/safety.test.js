@@ -142,10 +142,11 @@ test('the guard itself works: it records and blocks a non-loopback socket, looku
   assert.deepEqual(guard.attempts.sort(), ['fetch:example.com', 'socket:203.0.113.5']);
 });
 
-test('source scan: only http.js opens outbound connections; no fs writes; no environment-supplied target', () => {
+test('source scan: only http.js (loopback) and netguard.js (Real, configured issuer only) open outbound connections; no fs writes; no environment-supplied target', () => {
   for (const f of sources()) {
     const text = fs.readFileSync(f, 'utf8');
     const name = path.relative(srcDir, f);
+    if (name !== 'netguard.js') assert.doesNotMatch(text, /globalThis\.fetch|[a-z]Fetch\(/, `${name} must not reach the real fetch`);
     if (name !== 'http.js') {
       assert.doesNotMatch(text, /\bfetch\(/, `${name} must not call fetch`);
       assert.doesNotMatch(text, /http\.request\(|https\.request|node:https|net\.connect|node:dns|node:child_process|WebSocket/, `${name} must not open its own connections or processes`);
@@ -153,6 +154,13 @@ test('source scan: only http.js opens outbound connections; no fs writes; no env
     assert.doesNotMatch(text, /writeFile|appendFile|createWriteStream|mkdirSync|\.writeSync/, `${name} must not write files`);
     assert.doesNotMatch(text, /process\.env\.\w*(TARGET|URL|PROXY)/i, `${name} takes no target from the environment`);
   }
+});
+
+test('the netguard is the only door to a real host, and only app.js and doctor.js import it', () => {
+  const importers = sources().filter((f) => /from '\.\/netguard\.js'/.test(fs.readFileSync(f, 'utf8'))).map((f) => path.relative(srcDir, f)).sort();
+  assert.deepEqual(importers, ['app.js', 'doctor.js']);
+  const ng = fs.readFileSync(path.join(srcDir, 'netguard.js'), 'utf8');
+  assert.match(ng, /redirect: 'manual'/); assert.match(ng, /AbortSignal\.timeout/); assert.match(ng, /url\.origin !== allowedOrigin/);
 });
 
 test('the checker never builds a credential header', () => {

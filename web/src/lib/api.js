@@ -26,6 +26,7 @@ async function call(path, method = "GET", body) {
   if (!res.ok) {
     const err = new Error(data?.message || data?.error || `HTTP ${res.status}`);
     err.status = res.status;
+    err.data = data; // a failed Real call carries the trace of what was sent and answered
     throw err;
   }
   return data;
@@ -37,6 +38,7 @@ export const getInfo = () => call("/api/info");
 export const setMode = (source) => call("/api/mode", "POST", { source });
 export const postMint = (sample) => call("/api/mint", "POST", { sample });
 export const postDecode = (token, verify) => call("/api/decode", "POST", { token, verify });
+export const postIntrospect = (token) => call("/api/introspect", "POST", { token });
 export const getTesterCases = () => call("/api/tester/cases");
 export const postTesterRun = (caseId) => call("/api/tester/run", "POST", { case: caseId });
 export const postCheckerRun = (body) => call("/api/checker/run", "POST", body);
