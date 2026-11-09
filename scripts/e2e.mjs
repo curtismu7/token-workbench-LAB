@@ -65,9 +65,6 @@ try {
   await page.getByTestId('mode-mock').and(page.locator('[aria-pressed="true"]')).waitFor();
   check(await page.getByTestId('mode-real').isDisabled(), 'Real is disabled without the owner\'s settings');
   check(/TW_REAL_ISSUER/.test(await page.getByTestId('mode-real').getAttribute('title')), 'the Real button\'s tooltip names the settings');
-  await page.getByTestId('real-status').locator('summary').click();
-  const rs = await page.getByTestId('real-status').innerText();
-  check(/Real not configured/.test(rs) && /TW_REAL_CLIENT_SECRET/.test(rs) && /docker-compose\.yml/.test(rs), 'the "Real not configured" card lists the settings and where they go');
 
   // Keyboard only: skip link, then Tab through the four tabs and the theme button.
   await page.keyboard.press('Tab');
@@ -75,6 +72,9 @@ try {
   const reached = [];
   for (let i = 0; i < 8; i++) { await page.keyboard.press('Tab'); reached.push(await active()); }
   for (const n of ['Decode / Trace', 'Wrong-token tester', 'Profile checker', 'Flow catalog']) check(reached.some((r) => r.endsWith(`|${n}`)), `Tab reaches the "${n}" tab`);
+  await page.getByTestId('real-status').locator('summary').click();
+  const rs = await page.getByTestId('real-status').innerText();
+  check(/Real not configured/.test(rs) && /TW_REAL_CLIENT_SECRET/.test(rs) && /docker-compose\.yml/.test(rs), 'the "Real not configured" card lists the settings and where they go');
 
   // 1. Decode: mint a DPoP token by keyboard-reachable button, then decode with verification.
   await page.getByRole('button', { name: 'DPoP-bound' }).focus();
