@@ -11,12 +11,13 @@ API (server/src/app.js)  host guard -> origin/CSRF guard -> credential guard -> 
    |-- tester ................ tester.js --http.js--> stub resource server + issuer :5916 (validator.js)
    |-- checker ............... checker.js --http.js--> stub authorization server :5911-5915 (or a loopback target)
    |-- flows ................. catalog.js (pure, in-memory)
+   |-- Real (owner opt-in) ... real.js --netguard.js--> the configured issuer's origin only (https)
    and runtime.js: starts the stubs, owns the run queue
 ```
 
 ## Ports
 
-All in 5900-5999. `5910` API. `5911-5915` the five authorization-server profiles (`good`, `loose-redirect`, `implicit-ropc`, `no-pkce`, `missing-metadata`). `5916` stub resource server and issuer. `5917-5919` reserved for the stubs. `5930` reserved for the Vite dev server, `5940` for the e2e script. Tests take a free run of ports from `5950-5997`, each test file in its own 8-port slice.
+All in 5900-5999. `5910` API. `5911-5915` the five authorization-server profiles (`good`, `loose-redirect`, `implicit-ropc`, `no-pkce`, `missing-metadata`). `5916` stub resource server and issuer. `5917-5919` reserved for the stubs. `5930` reserved for the Vite dev server, `5940` for the e2e script, `5920-5926` for the Real e2e script (`scripts/e2e-real.mjs`). Tests take a free run of ports from `5950-5997`, each test file in its own 8-port slice.
 
 ## Modules (`server/src`)
 
@@ -33,6 +34,8 @@ All in 5900-5999. `5910` API. `5911-5915` the five authorization-server profiles
 | `checker.js` | The probe engine and the two rule packs. |
 | `catalog.js` | The six mechanisms as data, a `decide` function each, `runFlow`, `compare`. |
 | `runtime.js` | Starts and stops the stubs, owns the run queue. |
+| `real.js` | Real mode: the `TW_REAL*` settings (secret kept in a closure, scrubbed from traces), and the Real operations (client_credentials, JWKS verify, introspection, metadata-only checker), each returning its trace. |
+| `netguard.js` | The only door to a real host. Mock: refuses everything. Real: https to the configured issuer's origin only, no redirects, 10 s deadline, 256 KiB cap. Self-test used by the doctor. |
 | `app.js`, `index.js`, `health.js`, `doctor.js`, `sanitize.js` | API, entry point, `demo-health/1`, preflight, inert text. |
 
 ## The tester

@@ -1,5 +1,5 @@
 // Builds what the API serves from: the stub issuer keys, five stub authorization servers and the stub resource server,
-// all in this process on loopback. Mock only; there is no live mode.
+// all in this process on loopback. This is Mock; Real (real.js) never uses these stubs.
 import { createKeyring, identifiers } from './keys.js';
 import { startAuthServer, PROFILE_ORDER } from './stubs/authserver.js';
 import { startResourceServer } from './stubs/resource.js';

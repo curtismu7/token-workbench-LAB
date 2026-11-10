@@ -33,6 +33,9 @@ test('the pack covers the app and carries the caveats: decode vs verify, wrong t
   assert.match(text('flow-catalog-simulation'), /does not run the real protocols and models no product/);
   assert.match(text('rfc-9700-pack'), /only RFC numbers are cited/);
   assert.match(text('mock-only'), /no live mode/);
+  assert.match(text('real-mode'), /Off unless the owner sets TW_REAL=1/);
+  assert.match(text('real-mode'), /origin only/);
+  assert.match(text('real-mode'), /client secret is never shown/);
   assert.match(pack.stories.find((s) => s.id === 'S03').say, /UNVERIFIED/);
   assert.match(pack.stories.find((s) => s.id === 'S04').say, /simulation/);
 });

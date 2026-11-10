@@ -2,11 +2,11 @@
 
 Tier: Demo.
 
-A mock-only workbench for OAuth and JWT tokens. It decodes and explains a token offline, tests what a resource server does when it is sent the wrong token, checks stub authorization servers against OAuth security rules, and compares PAR, RAR, DPoP, mTLS, JAR and PKCE with and without the protection.
+A workbench for OAuth and JWT tokens, with Mock (the default) and an owner opt-in Real mode. It decodes and explains a token offline, tests what a resource server does when it is sent the wrong token, checks authorization servers against OAuth security rules, and compares PAR, RAR, DPoP, mTLS, JAR and PKCE with and without the protection.
 
 Repo: https://github.com/curtismu7/token-workbench-LAB
 
-Everything runs against stubs inside this process, on loopback. Nothing real is contacted: no tenant, no real authorization server, no network.
+In Mock everything runs against stubs inside this process, on loopback. Nothing real is contacted: no tenant, no real authorization server, no network. Real is off unless the owner configures it (see [Real mode](#real-mode)); it then calls one configured PingOne or PingFederate issuer and nothing else. Customer Agent LAB's UC-LEARN17 (OAuth debug, live token flow log) hands off here: the Real trace is that log.
 
 ## Run from a clone
 
@@ -64,6 +64,7 @@ npm test            # server (node:test), web (vitest) and script tests
 npm run build       # builds web/dist, which the server serves at /
 npm start           # http://127.0.0.1:5910/  (TW_PORT to change; ports 5900-5999 only)
 npm run dev         # Vite dev server on 5930, proxying /api to the server on 5910 (start the server first)
+npm run e2e:real    # Real mode in Chromium against an in-process stub issuer (no real tenant), ports 5920-5926; needs npm run build
 npm run e2e         # real Chromium against the real server on 5940; needs npm run build first and a Playwright browser (`npx playwright install chromium`, once)
 ```
 
@@ -85,13 +86,16 @@ All POST bodies are JSON objects with a fixed set of fields; any other field (a 
 | Route | Does |
 | --- | --- |
 | `GET /api/health` | `demo-health/1`; `runtime` is always `offline`. |
-| `GET /api/meta` | Mode, issuer, resource, stub profiles, ports, rule lists. |
+| `GET /api/meta` | Mode, `source` (mock or real), issuer, resource, stub profiles, ports, rule lists. |
+| `GET /api/info` | Rule 19 toggle state: `source`, `realAvailable` and `real` (setting names, what is missing, the issuer when configured; never a secret or client id). |
+| `POST /api/mode` `{source}` | Switch between `mock` and `real` without a restart. Real when not configured: 409 `real_not_configured` naming the missing settings. Hosted build: 403. |
 | `GET /api/jwks` | The stub issuer's public key set (the private keys exist only in memory). |
-| `POST /api/mint` `{sample}` | A signed sample token: `agent`, `user`, `dpop`, `mtls` or `expired`. The raw token is returned on purpose. |
-| `POST /api/decode` `{token, verify?}` | Header, payload (inert text), explained claims, time status, signature state. Tokens longer than 8192 characters are refused. |
+| `POST /api/mint` `{sample}` | Mock: a signed sample token (`agent`, `user`, `dpop`, `mtls` or `expired`), `label: "MOCK"`. Real: `sample` must be `client_credentials`; a token from the configured issuer, `label: "REAL"`, with the `trace`. The raw token is returned on purpose. |
+| `POST /api/decode` `{token, verify?}` | Header, payload (inert text), explained claims, time status, signature state. Tokens longer than 8192 characters are refused. With `verify` in Real the signature is checked against the issuer's real JWKS (RS256 or ES256) and the `trace` is returned. |
+| `POST /api/introspect` `{token}` | RFC 7662. Mock: the stub issuer answers in this process (signature, `iss`, `exp`, `nbf`). Real: the issuer's `introspection_endpoint`, authenticated as the configured client, with the `trace`. |
 | `GET /api/tester/cases` | The 15 cases and what each teaches. |
 | `POST /api/tester/run` `{case}` | `case` is a case id or `all`. Returns, per case, the minted token, the expected and actual answer, the failed check and `pass`. |
-| `POST /api/checker/run` `{profile \| target, pack?}` | `profile` is a stub id (`good`, `loose-redirect`, `implicit-ropc`, `no-pkce`, `missing-metadata`); `target` is an `http://` loopback URL. `pack` is `bcp`, `fapi` or `both` (default). |
+| `POST /api/checker/run` `{profile \| target, pack?}` | Mock: `profile` is a stub id (`good`, `loose-redirect`, `implicit-ropc`, `no-pkce`, `missing-metadata`); `target` is an `http://` loopback URL. `pack` is `bcp`, `fapi` or `both` (default). Real: send only `pack`; the configured issuer's published metadata is read once and judged; rules that need active probes are `not_checked`. |
 | `GET /api/flows`, `GET /api/flows/compare`, `POST /api/flows/run` `{mechanism, protected}` | The catalog, the side-by-side table, and one mock flow with its step trace and attack outcome. |
 
 Checker and tester runs share one queue: one runs, one may wait, a third gets 429 with `Retry-After`.
@@ -118,7 +122,34 @@ The stub resource server and issuer is on 5916 (`POST /mcp`, `GET /.well-known/o
 | `MODE` | `local` | `local` (the standalone) or `se-mock` (the hosted, simulated build for the SE k8s cluster, see below). Anything else stops startup. |
 | `TW_PUBLIC_ORIGIN` | unset | se-mock only: the one https origin of the hosted build, accepted for POSTs behind the ingress. |
 
-There is no live mode and no setting that changes where the tools connect. A `.env` file at the repo root is read for local runs (never commit it).
+Mock is the default; Real stays off unless the owner sets the `TW_REAL*` settings below. No other setting changes where the tools connect. A `.env` file at the repo root (beside `docker-compose.yml`) is read for local runs and by Docker Compose (never commit it; `.env.example` lists the names).
+
+## Real mode
+
+Real performs the Decode / Trace operations and the Profile checker against a real PingOne or PingFederate issuer that the owner configures. It is owner-run: agents and tests never use a real tenant (the tests use stub issuers on loopback).
+
+**Turn it on.** Copy `.env.example` to `.env` beside `docker-compose.yml` and fill in:
+
+| Setting | Needed | What it is |
+| --- | --- | --- |
+| `TW_REAL` | required | Exactly `1` to opt in. Anything else keeps Real off. |
+| `TW_REAL_ISSUER` | required | The issuer, `https` with a host name (no IP, no localhost, no query). PingOne: `https://auth.pingone.<region>/<environment id>/as`. PingFederate: its base URL, as in its `/.well-known/openid-configuration`. |
+| `TW_REAL_CLIENT_ID` | required | A client that may use the `client_credentials` grant and introspect tokens. |
+| `TW_REAL_CLIENT_SECRET` | required | Its secret. Write-only: never shown, returned or logged; scrubbed from every trace. |
+| `TW_REAL_SCOPE` | optional | Scopes for the `client_credentials` request, space separated. |
+| `TW_REAL_TOKEN_AUTH` | optional | `client_secret_basic` (default) or `client_secret_post`. |
+
+Restart the lab (`npm start`, or `docker compose up -d`). `npm run doctor` says `real: Real available` or names exactly what is missing. The lab starts in Real when it is configured; the header toggle switches between Mock and Real without a restart. With anything missing, the Real button is disabled, its tooltip names the settings, and a "Real not configured" card lists them. No admin or worker credential is needed; nothing goes in `~/.config/demo-kit/provisioning.json`.
+
+**What Real does** (each lists every HTTP exchange in a trace, the live token flow log):
+
+- **Get a token**: discovery, then `client_credentials` at the issuer's `token_endpoint`. The token is shown raw and labelled REAL.
+- **Verify**: the signature against the issuer's real JWKS (`jwks_uri`, fetched each time), RS256 or ES256, and whether `iss` matches.
+- **Introspect**: RFC 7662 at the issuer's `introspection_endpoint`.
+- **Profile checker**: one GET of the issuer's metadata, judged against both packs. Active probes (crafted authorization and token requests) are never sent to a real issuer, so those rules show NOT CHECKED, and a PASS means "advertised", not "enforced".
+- The **Wrong-token tester** and the **Flow catalog** have no Real version: they always use the stubs and say so in Real.
+
+**Limits that keep it safe.** Every Real request goes through `server/src/netguard.js`: https only, to the configured issuer's origin only (an endpoint on another host, even one named in the issuer's own metadata, is refused), redirects reported and never followed, 10 s deadline, 256 KiB body cap. In Mock the netguard refuses every request. The hosted build (`MODE=se-mock`) refuses to start with any `TW_REAL*` setting. A PingFederate with a private CA: start the host-run lab with `NODE_EXTRA_CA_CERTS` pointing at that CA file.
 
 ## Docker
 

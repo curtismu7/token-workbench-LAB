@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-Token Workbench is a mock-only workbench for OAuth and JWT tokens (tier: Tester). It decodes and explains a token offline, sends 15 wrong tokens to a stub resource server, checks five stub authorization servers against OAuth rules, and compares PKCE, PAR, RAR, DPoP, mTLS and JAR with and without protection. Everything runs in-process on loopback. Details are in [README.md](README.md), [docs/safety.md](docs/safety.md) and [docs/architecture.md](docs/architecture.md); do not copy them here.
+Token Workbench is a workbench for OAuth and JWT tokens (tier: Tester), Mock by default with an owner opt-in Real mode (`TW_REAL*` in the lab's `.env`; README "Real mode"). It decodes and explains a token offline, sends 15 wrong tokens to a stub resource server, checks five stub authorization servers against OAuth rules, and compares PKCE, PAR, RAR, DPoP, mTLS and JAR with and without protection. Everything runs in-process on loopback. Details are in [README.md](README.md), [docs/safety.md](docs/safety.md) and [docs/architecture.md](docs/architecture.md); do not copy them here.
 
 ## Commands (from package.json)
 
@@ -10,6 +10,7 @@ npm test             # server (node:test) + web (vitest) + node --test scripts/*
 npm run build        # web/dist, served by the server at /
 npm run doctor       # node, bind, port range, free ports
 npm run e2e          # real Chromium on port 5940; build first
+npm run e2e:real     # Real mode in Chromium against a stub issuer on loopback (ports 5920-5926); build first
 npm run content-pack # regenerate and validate content-pack.json
 npm start            # http://127.0.0.1:5910/  (TW_PORT; must be in 5900-5999)
 ```
@@ -18,7 +19,9 @@ Port 5910 is the app; stubs use fixed ports 5911-5916, so `npm start` and `npm r
 
 ## Rules that bite here
 
-- Loopback only, with the Host and Origin guards. No real network, no real tenants; the only outbound target the checker accepts is a user-typed loopback `http://` URL.
+- Loopback only, with the Host and Origin guards. Mock: no real network, no real tenants; the only outbound target the checker accepts is a user-typed loopback `http://` URL.
+- Real is owner-run. Agents and tests NEVER use a real tenant: Real tests use stub issuers on loopback (`server/test/real.test.js` hands the app a `realFetch` that maps `https://idp.example` to a loopback stub). Every Real request goes through `server/src/netguard.js` (configured issuer origin only); no other module may reach the real fetch (`safety.test.js` source scan).
+- The client secret is write-only: it stays in the closure in `real.js`, is scrubbed from every trace, and never appears in `/api/info`, the doctor, logs or errors. Never add it to a response.
 - Server-provided text is rendered inert (React text nodes, never HTML).
 - Test scripts use globs (`node --test scripts/*.test.mjs`), never a directory.
 - Never use `crypto.generateKeyPairSync` or async `generateKeyPair` for EC keys (SIGABRT on Node 20 in CI); use `createECDH` + `createPrivateKey`/`createPublicKey` or fixtures.

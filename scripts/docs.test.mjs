@@ -35,8 +35,15 @@ test('every API route in the README exists in the app', () => {
   }
 });
 
-test('the docs state the mock-only default, mark FAPI UNVERIFIED and explain why remote targets are refused', () => {
-  assert.match(read('README.md'), /no live mode/i);
+test('the docs state the Mock default and the Real opt-in, mark FAPI UNVERIFIED and explain why remote targets are refused', () => {
+  const readme = read('README.md');
+  assert.match(readme, /Mock is the default; Real stays off unless the owner sets/);
+  assert.match(readme, /## Real mode/);
+  for (const name of ['TW_REAL', 'TW_REAL_ISSUER', 'TW_REAL_CLIENT_ID', 'TW_REAL_CLIENT_SECRET', 'TW_REAL_SCOPE', 'TW_REAL_TOKEN_AUTH']) {
+    assert.match(readme, new RegExp(`\\| \`${name}\` \\|`), `README documents ${name}`);
+    assert.match(read('.env.example'), new RegExp(`^${name}=`, 'm'), `.env.example lists ${name}`);
+  }
+  assert.doesNotMatch(read('.env.example'), /^TW_REAL_CLIENT_(ID|SECRET)=\S/m, '.env.example carries no client id or secret value');
   assert.match(read('README.md'), /UNVERIFIED/);
   assert.match(read('docs/safety.md'), /FAPI 2\.0 pack: UNVERIFIED/);
   assert.match(read('docs/safety.md'), /Nothing here is verified about specific Ping products/);

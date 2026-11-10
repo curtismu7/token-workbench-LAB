@@ -8,11 +8,11 @@ import { HEALTH, META, stubFetch } from "./test/fixtures.js";
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 
 describe("Mock/Real toggle (rule 19)", () => {
-  it("local, mock only: Mock is pressed and Real is disabled with the reason", () => {
+  it("local, Real not configured: Mock is pressed and Real is disabled naming the settings", () => {
     render(<ModeToggle info={{ mode: "local", hosted: false, source: "mock", realAvailable: false }} onSelect={() => {}} />);
     expect(screen.getByTestId("mode-mock")).toHaveAttribute("aria-pressed", "true");
     expect(screen.getByTestId("mode-real")).toBeDisabled();
-    expect(screen.getByTestId("mode-real")).toHaveAttribute("title", expect.stringMatching(/no live version/));
+    expect(screen.getByTestId("mode-real")).toHaveAttribute("title", expect.stringMatching(/Real is not configured. Set TW_REAL, TW_REAL_ISSUER, TW_REAL_CLIENT_ID, TW_REAL_CLIENT_SECRET in the .env file beside docker-compose.yml/));
   });
 
   it("hosted: Real is disabled saying the hosted build is Mock only", () => {

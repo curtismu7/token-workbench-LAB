@@ -11,7 +11,7 @@ Nothing in this repo has been deployed. The first deploy of each app to the SE c
 
 | Area | Behaviour |
 | --- | --- |
-| Config | `MODE` is `local` (default) or `se-mock`. Any other value (`live`, `prod`, `mock`, `SE-MOCK` ...) stops startup and fails `npm run doctor` and `/api/health` (`broken`). There is no live mode. |
+| Config | `MODE` is `local` (default) or `se-mock`. Any other value (`live`, `prod`, `mock`, `SE-MOCK` ...) stops startup and fails `npm run doctor` and `/api/health` (`broken`). Real (a runtime toggle of the local build) is refused: any `TW_REAL*` setting stops startup in se-mock. |
 | Live flags | In se-mock, setting any of `TW_LIVE`, `TW_ALLOW_REMOTE`, `TW_ALLOW_TARGETS`, `TW_CHECKER_TARGETS`, `LIVE` is refused at startup and by doctor. (This app never honoured them; refusing them stops a manifest edit from implying a live capability.) |
 | Checker targets | A user-typed `target` is refused for every URL, loopback included (`400 target_refused`, reason `hosted_build`). Only the five built-in stub profiles of the visitor's own workspace can be checked. The local build still accepts a loopback `http://` URL. |
 | `.env` | Not read in se-mock. |

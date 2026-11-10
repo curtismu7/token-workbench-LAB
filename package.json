@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Mock-only token workbench: decode and explain tokens, test wrong-token rejection against a stub resource server, check stub authorization servers against OAuth rules, compare PAR/RAR/DPoP/mTLS/JAR/PKCE flows. Stubs only; nothing real is touched.",
+  "description": "Token workbench (Mock by default, owner opt-in Real against one configured issuer): decode, verify and introspect tokens, test wrong-token rejection against a stub resource server, check stub authorization servers against OAuth rules, compare PAR/RAR/DPoP/mTLS/JAR/PKCE flows. Stubs only; nothing real is touched.",
   "license": "MIT",
   "workspaces": [
     "server",
@@ -20,6 +20,7 @@
     "dev": "npm run dev -w web",
     "build": "npm run build -w web",
     "e2e": "node scripts/e2e.mjs",
+    "e2e:real": "node scripts/e2e-real.mjs",
     "content-pack": "node scripts/build-content-pack.mjs && node scripts/validate-content-pack.mjs",
     "check:forbidden": "node scripts/check-forbidden-strings.mjs"
   },

@@ -76,6 +76,10 @@ jobs:
       - run: npm run e2e
         env:
           E2E_SHOTS: ${{ runner.temp }}/e2e-screenshots
+      # Real mode in the browser against an in-process stub issuer on loopback (no real tenant, no outbound request).
+      - run: npm run e2e:real
+        env:
+          E2E_SHOTS: ${{ runner.temp }}/e2e-screenshots
       - name: Screenshots (on failure)
         if: failure()
         uses: actions/upload-artifact@v4
