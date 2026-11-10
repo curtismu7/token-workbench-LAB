@@ -10,6 +10,7 @@ npm test             # server (node:test) + web (vitest) + node --test scripts/*
 npm run build        # web/dist, served by the server at /
 npm run doctor       # node, bind, port range, free ports
 npm run e2e          # real Chromium on port 5940; build first
+npm run e2e:real     # Real mode in Chromium against a stub issuer on loopback (ports 5920-5926); build first
 npm run content-pack # regenerate and validate content-pack.json
 npm start            # http://127.0.0.1:5910/  (TW_PORT; must be in 5900-5999)
 ```

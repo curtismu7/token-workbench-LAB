@@ -25,16 +25,20 @@ async function startStubIssuer() {
   const jwk = { ...publicKey.export({ format: 'jwk' }), kid: 'stub-rs-1', alg: 'RS256', use: 'sig' };
   const issued = new Set();
   const seen = [];
-  const stub = { fault: null, seen, issued };
+  const stub = { fault: null, seen, issued, secret: SECRET };
   const sign = (payload) => {
     const input = `${b64u(JSON.stringify({ alg: 'RS256', kid: 'stub-rs-1', typ: 'JWT' }))}.${b64u(JSON.stringify(payload))}`;
     return `${input}.${b64u(crypto.sign('sha256', Buffer.from(input), privateKey))}`;
   };
   stub.sign = sign;
+  stub.signAs = (kid, payload) => {
+    const input = `${b64u(JSON.stringify({ alg: 'RS256', kid }))}.${b64u(JSON.stringify(payload))}`;
+    return `${input}.${b64u(crypto.sign('sha256', Buffer.from(input), privateKey))}`;
+  };
   const clientOk = (req, form) => {
     if (stub.fault === 'bad-secret') return false;
-    if (req.headers.authorization) return req.headers.authorization === basic(CLIENT_ID, SECRET);
-    return form.get('client_id') === CLIENT_ID && form.get('client_secret') === SECRET;
+    if (req.headers.authorization) return req.headers.authorization === basic(CLIENT_ID, stub.secret);
+    return form.get('client_id') === CLIENT_ID && form.get('client_secret') === stub.secret;
   };
   const server = http.createServer((req, res) => {
     let body = '';
@@ -54,7 +58,15 @@ async function startStubIssuer() {
           code_challenge_methods_supported: ['S256'], pushed_authorization_request_endpoint: `${ISSUER}/par`, dpop_signing_alg_values_supported: ['ES256'],
         });
       }
-      if (req.url === '/as/jwks') return json(200, { keys: [jwk] });
+      if (req.url === '/as/jwks') {
+        if (stub.fault === 'huge') { res.writeHead(200, { 'content-type': 'application/json' }); return res.end(`{"keys":[],"pad":"${'x'.repeat(600 * 1024)}"}`); }
+        return json(200, { keys: [jwk] });
+      }
+      if (req.url === '/as/token' && req.method === 'POST' && stub.fault === 'echo-all') {
+        // The worst issuer: the secret as the error code (it reaches the 502 message) and the raw form body echoed back.
+        return json(400, { error: stub.secret.slice(0, 50), error_description: body, json_echo: JSON.stringify(stub.secret) }, { 'www-authenticate': `Basic realm="${req.headers.authorization || ''}"` });
+      }
+      if (req.url === '/as/introspect' && stub.fault === 'echo-all') return json(200, { active: false, echoed: body });
       if (req.url === '/as/token' && req.method === 'POST') {
         if (!clientOk(req, form)) {
           // A misbehaving server that echoes the credentials it was sent: the lab must scrub them.
@@ -144,6 +156,10 @@ test('Real decode verifies against the issuer\'s real JWKS; a tampered token is 
   assert.equal((await app.post('/api/decode', { token: forged, verify: true })).json.signature.state, 'invalid');
   const noKid = stub.sign({ iss: ISSUER }).replace(/^[^.]+/, b64u(JSON.stringify({ alg: 'RS256', kid: 'unknown' })));
   assert.equal((await app.post('/api/decode', { token: noKid, verify: true })).json.signature.state, 'invalid');
+  // Correctly signed by the issuer's key but naming a kid the JWKS does not have: never verified against another key.
+  const otherKid = stub.signAs('unknown', { iss: ISSUER });
+  const ok2 = await app.post('/api/decode', { token: otherKid, verify: true });
+  assert.equal(ok2.json.signature.state, 'invalid'); assert.match(ok2.json.signature.note, /not in the issuer's JWKS/);
   const hs = `${b64u(JSON.stringify({ alg: 'HS256' }))}.${b64u('{}')}.x`;
   assert.match((await app.post('/api/decode', { token: hs, verify: true })).json.signature.note, /not verified here/);
   const nv = await app.post('/api/decode', { token, verify: false });
@@ -327,4 +343,47 @@ test('health says runtime live while Real is on and offline in Mock (health cont
   assert.equal((await app.get('/api/health')).json.runtime, 'live');
   await app.post('/api/mode', { source: 'mock' });
   assert.equal((await app.get('/api/health')).json.runtime, 'offline');
+});
+
+test('an issuer that echoes the secret everywhere (error code, form body, JSON-escaped, Basic header) leaks nothing: basic and post, a secret with ~ and quotes', async (t) => {
+  for (const auth of ['client_secret_basic', 'client_secret_post']) {
+    const secret = 'abc~DEF.ghi_JKL-mno~PQR "q" \\ (x)*!\'';
+    const { app, stub } = await realApp(t, { ...REAL_ENV, TW_REAL_CLIENT_SECRET: secret, TW_REAL_TOKEN_AUTH: auth });
+    stub.secret = secret; stub.fault = 'echo-all';
+    const forms = [secret, encodeURIComponent(secret), new URLSearchParams({ s: secret }).toString().slice(2), JSON.stringify(secret).slice(1, -1), Buffer.from(secret).toString('base64'), basic(CLIENT_ID, secret).slice(6), secret.slice(0, 50)];
+    const mint = await app.post('/api/mint', { sample: 'client_credentials' });
+    assert.equal(mint.status, 502, auth);
+    const intro = await app.post('/api/introspect', { token: 'a.b.c' });
+    assert.equal(intro.status, 200, auth);
+    for (const raw of [mint.raw, intro.raw]) for (const f of forms) assert.ok(!raw.includes(f), `${auth}: an encoding of the secret leaked`);
+    assert.match(mint.json.message, /\[redacted\]/, 'the 502 message itself is scrubbed');
+  }
+});
+
+test('the netguard caps a response body at 256 KiB; a truncated JWKS is never trusted', async (t) => {
+  const { app, stub } = await realApp(t);
+  const { token } = (await app.post('/api/mint', { sample: 'client_credentials' })).json;
+  stub.fault = 'huge';
+  const r = await app.post('/api/decode', { token, verify: true });
+  assert.equal(r.status, 502); assert.match(r.json.message, /JWKS endpoint answered 200/);
+  const j = r.json.trace.at(-1);
+  assert.equal(j.response.truncated, true); assert.ok(j.response.body.length <= 256 * 1024, String(j.response.body.length));
+});
+
+test('the hosted build never turns Real on, even if handed a complete Real configuration', async (t) => {
+  const { createApp } = await import('../src/app.js');
+  const { createRuntime } = await import('../src/runtime.js');
+  const rt = await createRuntime({ ephemeral: true }); t.after(rt.close);
+  const app = createApp({ runtime: rt, deployMode: 'se-mock', real: realConfigFrom(REAL_ENV), webDist: null, realFetch: () => { throw new Error('must not fetch'); } });
+  const server = app.listen(0, '127.0.0.1'); await new Promise((r) => { server.once('listening', r); });
+  t.after(async () => { await app.workspaces?.closeAll(); await new Promise((r) => { server.closeAllConnections?.(); server.close(r); }); });
+  const { request } = await import('./helpers.js');
+  const info = await request(server.address().port, 'GET', '/api/info');
+  assert.equal(info.json.realAvailable, false); assert.equal(info.json.source, 'mock'); assert.equal(info.json.real, null);
+  assert.equal(app.netguard.allowedOrigin, null);
+});
+
+test('issuer normalisation: case is folded so discovery matches; trailing-dot localhost and spaces are refused', () => {
+  assert.equal(realConfigFrom({ ...REAL_ENV, TW_REAL_ISSUER: 'HTTPS://IDP.EXAMPLE/as' }).issuer, ISSUER);
+  for (const issuer of ['https://localhost./as', 'https://foo.localhost./', 'https://idp.example/a s', 'https://127.0.0.1./as']) assert.equal(realConfigFrom({ ...REAL_ENV, TW_REAL_ISSUER: issuer }).available, false, issuer);
 });

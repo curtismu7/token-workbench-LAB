@@ -28,7 +28,7 @@ Only if the owner set the `TW_REAL*` settings (README "Real mode"); otherwise th
 
 10. **Header toggle: Real.** Say: "Now the same tab talks to one real issuer, and nothing else. The banner names it."
 11. **Decode / Trace: REAL client_credentials token.** Say: "That is a real access token, labelled REAL, shown raw because this is a debugging tool. Underneath is the trace: the discovery request and the token request exactly as sent and answered. The client secret never appears; it shows as write-only."
-12. **Tick Verify, Decode; then Introspect at the issuer.** Say: "Verified against the issuer's real JWKS, then the issuer itself says whether the token is active. Each step adds to the log."
+12. **Tick Verify, Decode; then Introspect at the issuer.** Say: "Verified against the issuer's real JWKS, then the issuer itself says whether the token is active. The trace shows the requests of the step you just ran."
 13. **Profile checker in Real.** Say: "One GET of the issuer's published metadata. A pass here means advertised, not enforced; rules that need crafted attack requests say NOT CHECKED, because we never send those to a real server."
 14. **Back to Mock.** Say: "And back to stubs, without a restart."
 

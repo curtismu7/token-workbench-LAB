@@ -64,6 +64,7 @@ npm test            # server (node:test), web (vitest) and script tests
 npm run build       # builds web/dist, which the server serves at /
 npm start           # http://127.0.0.1:5910/  (TW_PORT to change; ports 5900-5999 only)
 npm run dev         # Vite dev server on 5930, proxying /api to the server on 5910 (start the server first)
+npm run e2e:real    # Real mode in Chromium against an in-process stub issuer (no real tenant), ports 5920-5926; needs npm run build
 npm run e2e         # real Chromium against the real server on 5940; needs npm run build first and a Playwright browser (`npx playwright install chromium`, once)
 ```
 

@@ -26,7 +26,7 @@ const SECRET_SHOWN = '[client secret: write-only, not shown]';
 
 // An IP literal or localhost is refused as an issuer: Real is for a named PingOne or PingFederate host, and this keeps a
 // typo from pointing the lab at link-local or private services. (A name that resolves to one cannot be seen here.)
-const isDirectAddress = (h) => /^\d{1,3}(\.\d{1,3}){3}$/.test(h) || h.startsWith('[') || h === 'localhost' || h.endsWith('.localhost');
+const isDirectAddress = (raw) => { const h = raw.replace(/\.+$/, ''); return /^\d{1,3}(\.\d{1,3}){3}$/.test(h) || h.startsWith('[') || h === 'localhost' || h.endsWith('.localhost') || h === ''; };
 
 export function checkIssuer(value) {
   if (typeof value !== 'string' || !value || value.length > 512 || CONTROL.test(value)) return { problem: 'TW_REAL_ISSUER must be a URL of 1 to 512 characters' };
@@ -36,7 +36,9 @@ export function checkIssuer(value) {
   if (u.username || u.password) return { problem: 'TW_REAL_ISSUER must not carry credentials' };
   if (u.search || u.hash) return { problem: 'TW_REAL_ISSUER must not have a query or fragment' };
   if (isDirectAddress(u.hostname.toLowerCase())) return { problem: 'TW_REAL_ISSUER must use a host name, not an IP address or localhost' };
-  return { issuer: value.replace(/\/+$/, ''), origin: u.origin };
+  if (/\s/.test(value)) return { problem: 'TW_REAL_ISSUER must not contain spaces' };
+  // Normalised (lower-case scheme and host) so it compares equal to the issuer in the discovery document.
+  return { issuer: u.href.replace(/\/+$/, ''), origin: u.origin };
 }
 
 // -> { optedIn, available, problems: [text], missing: [setting names], issuer, origin, clientId, scope, tokenAuth,
@@ -62,8 +64,12 @@ export function realConfigFrom(env = process.env) {
   const available = problems.length === 0;
 
   // The secret never leaves this closure except inside the outgoing request built by auth().
-  const forms = secret ? [secret, encodeURIComponent(secret), Buffer.from(`${encodeURIComponent(clientId)}:${encodeURIComponent(secret)}`).toString('base64')] : [];
-  const scrub = (text) => { let t = String(text); for (const f of forms) if (f) t = t.split(f).join('[redacted]'); return t; };
+  // Every encoding in which the secret could come back: raw, URL-encoded (both encoders), JSON-escaped, base64 alone, and
+  // the Basic value. forms[2] must stay the Basic value (auth() uses it).
+  const basicValue = Buffer.from(`${encodeURIComponent(clientId)}:${encodeURIComponent(secret)}`).toString('base64');
+  const forms = secret ? [secret, encodeURIComponent(secret), basicValue, new URLSearchParams({ s: secret }).toString().slice(2), JSON.stringify(secret).slice(1, -1), Buffer.from(secret).toString('base64'), Buffer.from(secret).toString('base64url')] : [];
+  const unique = [...new Set(forms.filter(Boolean))].sort((a, b) => b.length - a.length);
+  const scrub = (text) => { let t = String(text); for (const f of unique) t = t.split(f).join('[redacted]'); return t; };
   const auth = () => (tokenAuth === 'client_secret_post'
     ? { headers: {}, form: { client_id: clientId, client_secret: secret }, shown: { headers: {}, form: { client_id: clientId, client_secret: SECRET_SHOWN } } }
     : { headers: { authorization: `Basic ${forms[2]}` }, form: {}, shown: { headers: { authorization: `Basic ${SECRET_SHOWN}` }, form: {} } });

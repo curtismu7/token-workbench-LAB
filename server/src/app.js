@@ -64,10 +64,14 @@ export function createApp({ runtime, health = createHealth(), webDist = DEFAULT_
   const guard = createNetguard({ mode: () => source, allowedOrigin: realOk ? real.origin : null, ...(realFetch ? { realFetch } : {}) });
   const realClient = createRealClient({ config: real, guard });
   health.setRuntime?.(() => (source === 'real' ? 'live' : 'offline'));
+  // Every Real answer (result, error message, trace) leaves through here: the whole JSON is scrubbed of the client
+  // secret in every encoding, so an issuer that echoes it (in a message, a header, even a token field) cannot leak it.
+  const sendReal = (res, body, status = 200) => res.status(status).type('application/json').send(real.scrub(JSON.stringify(body)));
   const workspaces = hosted ? createWorkspaces({ defaultRuntime: runtime, create: createWorkspaceRuntime, ...workspaceOptions }) : null;
   const app = express();
   app.workspaces = workspaces;
   app.netguard = guard;
+  app.source = () => source;
   app.disable('x-powered-by');
   app.use(makeHostGuard(allowedHosts));
   app.use(makeOriginGuard(publicOrigin, allowedHosts));
@@ -133,7 +137,7 @@ export function createApp({ runtime, health = createHealth(), webDist = DEFAULT_
       if (b.sample !== 'client_credentials') return bad(res, 'In Real the only sample is client_credentials: a token from the configured issuer');
       const r = await realClient.token();
       // Raw token on purpose (education). It is a REAL token from the configured issuer: never logged, never stored.
-      return res.json({ source: 'real', label: 'REAL', sample: 'client_credentials', title: 'REAL access token (client_credentials)', token: r.token, tokenType: r.tokenType, expiresIn: r.expiresIn, trace: r.trace });
+      return sendReal(res, { source: 'real', label: 'REAL', sample: 'client_credentials', title: 'REAL access token (client_credentials)', token: r.token, tokenType: r.tokenType, expiresIn: r.expiresIn, trace: r.trace });
     }
     const s = typeof b.sample === 'string' && Object.hasOwn(SAMPLES, b.sample) ? SAMPLES[b.sample] : null;
     if (!s) return bad(res, `sample must be one of: ${Object.keys(SAMPLES).join(', ')}`);
@@ -158,7 +162,7 @@ export function createApp({ runtime, health = createHealth(), webDist = DEFAULT_
       else if (verifyEs256(p.signingInput, p.signature, jwk)) signature = { state: 'valid_stub_jwks', note: 'The signature verifies against the stub issuer\'s key (generated in memory in this process). That proves only that this app signed it.' };
       else signature = { state: 'invalid', note: 'The signature does not verify against the stub issuer\'s key.' };
     }
-    res.json({ source, ...(trace ? { trace } : {}), header: inertValue(p.header), payload: inertValue(p.payload), claims: explainClaims(p.header, p.payload, nowSec), time: timeStatus(p.payload, nowSec), signature, signaturePresent: p.signature.length > 0 });
+    (source === 'real' ? (body) => sendReal(res, body) : (body) => res.json(body))({ source, ...(trace ? { trace } : {}), header: inertValue(p.header), payload: inertValue(p.payload), claims: explainClaims(p.header, p.payload, nowSec), time: timeStatus(p.payload, nowSec), signature, signaturePresent: p.signature.length > 0 });
   }));
 
   // --- introspection (RFC 7662) ---
@@ -167,7 +171,7 @@ export function createApp({ runtime, health = createHealth(), webDist = DEFAULT_
   api.post('/introspect', wrap(async (req, res) => {
     const b = takeBody(req, res, ['token']); if (!b) return;
     if (typeof b.token !== 'string' || !b.token.trim() || b.token.length > MAX_TOKEN_CHARS) return bad(res, `token must be a non-empty string of at most ${MAX_TOKEN_CHARS} characters`);
-    if (source === 'real') { const r = await realClient.introspect(b.token.trim()); return res.json({ source: 'real', active: r.active, trace: r.trace }); }
+    if (source === 'real') { const r = await realClient.introspect(b.token.trim()); return sendReal(res, { source: 'real', active: r.active, trace: r.trace }); }
     const p = parseJwt(b.token);
     const nowSec = Math.floor(req.rt.now());
     const jwk = p.ok && typeof p.header.kid === 'string' ? req.rt.keyring.jwks().keys.find((k) => k.kid === p.header.kid) : null;
@@ -195,7 +199,7 @@ export function createApp({ runtime, health = createHealth(), webDist = DEFAULT_
       if (b.profile !== undefined || b.target !== undefined) return bad(res, 'In Real the checker reads the configured issuer\'s metadata: send only pack');
       const pk = b.pack ?? 'both';
       if (!['bcp', 'fapi', 'both'].includes(pk)) return bad(res, 'pack must be bcp, fapi or both');
-      return res.json({ profile: null, ...await realClient.checkMetadata(pk === 'both' ? ['bcp', 'fapi'] : [pk]) });
+      return sendReal(res, { profile: null, ...await realClient.checkMetadata(pk === 'both' ? ['bcp', 'fapi'] : [pk]) });
     }
     if ((b.profile === undefined) === (b.target === undefined)) return bad(res, 'send exactly one of profile (a stub profile id) or target (a loopback http URL)');
     const pack = b.pack ?? 'both';
@@ -232,7 +236,7 @@ export function createApp({ runtime, health = createHealth(), webDist = DEFAULT_
     if (err.code === 'workspace_cap') return res.set('Retry-After', '30').status(503).json({ error: 'workspace_cap', message: 'the hosted demo has too many active workspaces right now; try again in a few minutes' });
     if (err.code === 'run_queue_full') return res.set('Retry-After', '2').status(429).json({ error: 'run_queue_full', message: 'a run is in progress and another is already queued; try again shortly' });
     // A Real call that failed: the issuer's answer (or the netguard's refusal) and the trace so far, secret already scrubbed.
-    if (err instanceof RealError) return res.status(502).json({ error: 'real_error', source: 'real', message: err.message, trace: err.trace });
+    if (err instanceof RealError) return sendReal(res, { error: 'real_error', source: 'real', message: err.message, trace: err.trace }, 502);
     if (err instanceof TargetRefused) return res.status(400).json({ error: 'target_refused', reason: err.reason, message: err.message });
     if (err instanceof URIError || err.status === 400) return bad(res, 'malformed request');
     // Log the error class only: a message could echo part of a token.
@@ -265,7 +269,7 @@ export async function startHttpServer({ port = serverPort(), host = bindHost(), 
     httpServer.once('listening', () => {
       const { port: bound } = httpServer.address();
       resolve({
-        port: bound, host: httpServer.address().address, runtime: rt, workspaces: app.workspaces, netguard: app.netguard, deployMode, url: `http://127.0.0.1:${bound}/`,
+        port: bound, host: httpServer.address().address, runtime: rt, workspaces: app.workspaces, netguard: app.netguard, source: app.source(), deployMode, url: `http://127.0.0.1:${bound}/`,
         close: async () => { health.stop(); await new Promise((r) => { httpServer.closeAllConnections?.(); httpServer.close(r); }); await app.workspaces?.closeAll(); await rt.close(); },
       });
     });

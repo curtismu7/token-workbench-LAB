@@ -17,7 +17,7 @@ API (server/src/app.js)  host guard -> origin/CSRF guard -> credential guard -> 
 
 ## Ports
 
-All in 5900-5999. `5910` API. `5911-5915` the five authorization-server profiles (`good`, `loose-redirect`, `implicit-ropc`, `no-pkce`, `missing-metadata`). `5916` stub resource server and issuer. `5917-5919` reserved for the stubs. `5930` reserved for the Vite dev server, `5940` for the e2e script. Tests take a free run of ports from `5950-5997`, each test file in its own 8-port slice.
+All in 5900-5999. `5910` API. `5911-5915` the five authorization-server profiles (`good`, `loose-redirect`, `implicit-ropc`, `no-pkce`, `missing-metadata`). `5916` stub resource server and issuer. `5917-5919` reserved for the stubs. `5930` reserved for the Vite dev server, `5940` for the e2e script, `5920-5926` for the Real e2e script (`scripts/e2e-real.mjs`). Tests take a free run of ports from `5950-5997`, each test file in its own 8-port slice.
 
 ## Modules (`server/src`)
 

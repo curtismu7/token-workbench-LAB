@@ -100,3 +100,4 @@ summary { cursor: pointer; font-weight: 700; color: var(--status-info); }
 .trace { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.6rem; }
 .trace > li { padding: 0.6rem 0.75rem; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); overflow-wrap: anywhere; }
 .trace code { overflow-wrap: anywhere; }
+[data-testid="real-status"] th.mono { white-space: nowrap; }

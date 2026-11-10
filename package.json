@@ -20,6 +20,7 @@
     "dev": "npm run dev -w web",
     "build": "npm run build -w web",
     "e2e": "node scripts/e2e.mjs",
+    "e2e:real": "node scripts/e2e-real.mjs",
     "content-pack": "node scripts/build-content-pack.mjs && node scripts/validate-content-pack.mjs",
     "check:forbidden": "node scripts/check-forbidden-strings.mjs"
   },
