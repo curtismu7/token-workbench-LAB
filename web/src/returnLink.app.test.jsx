@@ -55,6 +55,18 @@ describe("hand-off from Customer Agent LAB", () => {
     });
   }
 
+  it("hand-off from AI Demo Standalone: the strip renders and Back goes to /ai-demo-standalone/", async () => {
+    stubFetch(base);
+    const assign = vi.fn();
+    vi.stubGlobal("location", { ...window.location, pathname: "/token-workbench/", search: "?from=ai-demo-standalone&uc=UC-LEARN17", assign });
+    render(<App />);
+    const strip = screen.getByRole("note", { name: "Opened from AI Demo Standalone" });
+    expect(strip).toHaveTextContent("UC-LEARN17");
+    for (const b of screen.getAllByRole("button", { name: /Back to AI Demo Standalone/ })) fireEvent.click(b);
+    expect(assign.mock.calls).toEqual([["/ai-demo-standalone/?returned=token-workbench&uc=UC-LEARN17"], ["/ai-demo-standalone/?returned=token-workbench&uc=UC-LEARN17"]]);
+    await waitFor(() => expect(screen.getByTestId("mode-badge")).toBeInTheDocument());
+  });
+
   it("no from, an unknown from or a bad id: no strip, no button, default tab", () => {
     for (const q of ["/", "/?from=elsewhere&uc=UC-LEARN6", "/?from=customer-agent&uc=a%20b", "/?from=customer-agent&uc=UC-LEARN6&vertical=%3Cb%3E"]) {
       stubFetch(base);
