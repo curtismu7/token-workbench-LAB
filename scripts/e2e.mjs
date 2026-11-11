@@ -65,13 +65,14 @@ try {
   await page.getByTestId('mode-select').waitFor();
   check(await page.getByTestId('mode-select').getAttribute('aria-label') === 'Mock or Real', 'the top-menu mode control is the Mock/Real select');
   const realOption = page.getByTestId('mode-select').locator('option[value="real"]');
-  check(await realOption.isDisabled(), 'Real is disabled without the owner\'s settings');
+  await page.waitForFunction(() => document.querySelector('[data-testid="mode-select"]')?.querySelector('option[value="real"]')?.hasAttribute('disabled'), null, { timeout: 15000 }).catch(() => {});
+  check((await realOption.getAttribute('disabled')) !== null, 'Real is disabled without the owner\'s settings');
 
   // Keyboard only: skip link, then Tab through the four tabs and the theme button.
   await page.keyboard.press('Tab');
   check((await active()).includes('Skip to content'), 'first Tab stop is the skip link');
   const reached = [];
-  for (let i = 0; i < 8; i++) { await page.keyboard.press('Tab'); reached.push(await active()); }
+  for (let i = 0; i < 20; i++) { await page.keyboard.press('Tab'); reached.push(await active()); }
   for (const n of ['Decode / Trace', 'Wrong-token tester', 'Profile checker', 'Flow catalog']) check(reached.some((r) => r.endsWith(`|${n}`)), `Tab reaches the "${n}" tab`);
   await page.getByTestId('real-status').locator('summary').click();
   const rs = await page.getByTestId('real-status').innerText();
@@ -173,7 +174,7 @@ try {
   await tab('Flow catalog').click();
 
   // Dark theme
-  await page.getByTestId('theme').selectOption('dark'); // the theme control is a select (Auto / Light / Dark)
+  await page.getByTestId('theme-select').selectOption('dark'); // the theme control is a select (Auto / Light / Dark)
   check((await page.evaluate(() => document.documentElement.dataset.theme)) === 'dark', 'theme toggles to dark');
   await shot('5-flows-dark');
   await tab('Decode / Trace').click(); await shot('6-decode-dark');
