@@ -6,7 +6,7 @@ import Tester from "./components/Tester.jsx";
 import Checker from "./components/Checker.jsx";
 import Flows from "./components/Flows.jsx";
 import Story from "./components/Story.jsx";
-import ModeToggle from "./components/ModeToggle.jsx";
+import TopMenu from "./top-menu/TopMenu";
 import RealStatus from "./components/RealStatus.jsx";
 import { workspaceId } from "./lib/api.js";
 import ReturnLink from "./return-link/ReturnLink.jsx";
@@ -62,24 +62,23 @@ export default function App() {
       <ReturnLink app="token-workbench" />
       <header className="top">
         <h1>Token Workbench</h1>
-        <ShelfLink headers={() => ({ "X-Workspace-Id": workspaceId() })} />
-        <ReturnLink app="token-workbench" variant="header" />
+        <TopMenu
+          mode={{ value: real ? "real" : "mock", onChange: onSelectMode, realAvailable: info ? info.realAvailable === true : null, realHint: info && !info.realAvailable ? "Real is not configured. Set TW_REAL, TW_REAL_CLIENT_SECRET in the .env file beside docker-compose.yml, then restart the lab." : undefined }}
+          theme={{ value: theme, onChange: setTheme }}
+          help={{ href: "https://github.com/curtismu7/token-workbench-LAB#readme" }}
+          version={info?.version || null}
+        >
+          <ShelfLink headers={() => ({ "X-Workspace-Id": workspaceId() })} />
+          <ReturnLink app="token-workbench" variant="header" />
+        </TopMenu>
         {real
           ? <span className="mode mode--real" data-testid="mode-badge">REAL<span className="sr-only">: calls go to the configured issuer</span></span>
           : <span className="mode mode--demo" data-testid="mode-badge">DEMO<span className="sr-only">: stub servers on loopback, nothing real is contacted</span></span>}
-        <ModeToggle info={info} onSelect={onSelectMode} />
         <nav aria-label="Tools">
           {TABS.map(([id, label]) => (
             <button key={id} type="button" className="tab" aria-pressed={tab === id} onClick={() => { setTab(id); setMessage(""); }}>{label}</button>
           ))}
         </nav>
-        <label className="inline">Theme
-          <select value={theme} onChange={(e) => setTheme(e.target.value)} data-testid="theme">
-            <option value="auto">Auto</option>
-            <option value="light">Light</option>
-            <option value="dark">Dark</option>
-          </select>
-        </label>
       </header>
       <main id="main" tabIndex={-1} className="page">
         <div role="status" aria-live="polite" className="live" data-testid="live">{message}</div>

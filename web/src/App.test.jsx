@@ -30,7 +30,7 @@ describe("shell", () => {
   it("sets dark and light on the document element via the theme select", async () => {
     stubFetch(base);
     render(<App />);
-    const select = screen.getByTestId("theme");
+    const select = screen.getByTestId("theme-select");
     await userEvent.selectOptions(select, "dark");
     expect(document.documentElement.dataset.theme).toBe("dark");
     await userEvent.selectOptions(select, "auto");

@@ -106,7 +106,7 @@ export function createApp({ runtime, health = createHealth(), webDist = DEFAULT_
   }));
   // Rule 19: the Mock/Real toggle's API. Real needs the owner's opt-in settings (real.js); the page gets their names and
   // what is missing, never a value of the secret or the client id.
-  const infoBody = () => ({ mode: deployMode, hosted, source, realAvailable: realOk, real: hosted ? null : realPublicView(real) });
+  const infoBody = () => ({ version: (() => { try { return JSON.parse(fs.readFileSync(new URL('../../package.json', import.meta.url), 'utf8')).version || null; } catch { return null; } })(), mode: deployMode, hosted, source, realAvailable: realOk, real: hosted ? null : realPublicView(real) });
   api.get('/info', (_req, res) => res.json(infoBody()));
   api.post('/mode', (req, res) => {
     const b = req.body;

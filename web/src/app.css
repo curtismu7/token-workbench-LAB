@@ -13,7 +13,7 @@ code, .mono { font-size: 0.85rem; overflow-wrap: anywhere; }
 
 .banner.hosted { border-left-color: var(--status-info); font-weight: 700; }
 .banner.warn { border-left-color: var(--status-warn); }
-.top { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 1.25rem; padding: 0.6rem 0; border-bottom: 1px solid var(--border); }
+.top { position: relative; display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 1.25rem; padding: 0.6rem 0; border-bottom: 1px solid var(--border); }
 .top nav { display: flex; flex-wrap: wrap; gap: 0.25rem; flex: 1 1 12rem; }
 .mode { padding: 0.15rem 0.6rem; border-radius: 4px; font: 700 0.8rem var(--font-mono); letter-spacing: 0.08em; border: 2px solid; }
 .mode--demo { color: var(--status-info); background: var(--surface-2); border-color: var(--status-info); }

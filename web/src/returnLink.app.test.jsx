@@ -36,7 +36,7 @@ describe("hand-off from Customer Agent LAB", () => {
     expect(strip).toHaveTextContent("UC-LEARN6");
     const banner = await screen.findByTestId("hosted-banner");
     expect(banner.nextElementSibling).toBe(strip);
-    expect(document.querySelector("header.top > button.return-link--header")).not.toBeNull();
+    expect(document.querySelector("header.top .top-menu button.return-link--header")).not.toBeNull();
     expect(pressed()).toEqual(["Flow catalog"]);
     expect(await screen.findByRole("heading", { name: "Token-flow catalog" })).toBeInTheDocument();
   });

@@ -55,7 +55,7 @@ describe("Real not configured", () => {
     stubFetch(base(INFO_REAL)); const { unmount } = render(<App />);
     await screen.findByText(/REAL: Decode/); expect(screen.queryByTestId("real-status")).toBeNull(); unmount();
     stubFetch(base({ mode: "se-mock", hosted: true, source: "mock", realAvailable: false, real: null }));
-    render(<App />); await waitFor(() => expect(screen.getByTestId("mode-mock")).toHaveAttribute("aria-pressed", "true"));
+    render(<App />); await waitFor(() => expect(screen.getByTestId("mode-select")).toHaveValue("mock"));
     expect(screen.queryByTestId("real-status")).toBeNull();
   });
 });
@@ -82,6 +82,7 @@ describe("Real mode", () => {
     stubFetch({ ...base(INFO_REAL), "POST /api/mint": { __status: 502, body: { error: "real_error", message: "the token endpoint answered 401 (invalid_client)", trace: [{ ...TRACE[1], status: 401 }] } } });
     render(<App />);
     await userEvent.click(await screen.findByRole("button", { name: "REAL client_credentials token" }));
+    await waitFor(() => expect(screen.getByTestId("mode-select")).toHaveValue("real"));
     expect(await screen.findByRole("alert")).toHaveTextContent("invalid_client");
     expect(screen.getByTestId("trace")).toHaveTextContent("HTTP 401");
   });
@@ -122,8 +123,9 @@ describe("Real mode", () => {
     stubFetch({ ...base(INFO_REAL), "POST /api/mint": { source: "real", label: "REAL", token: fakeToken(), trace: TRACE }, "POST /api/decode": decoded(), "POST /api/mode": (b) => ({ ...INFO_REAL, source: b.source }) });
     render(<App />);
     await userEvent.click(await screen.findByRole("button", { name: "REAL client_credentials token" }));
+    await waitFor(() => expect(screen.getByTestId("mode-select")).toHaveValue("real"));
     await screen.findByTestId("trace");
-    await userEvent.click(screen.getByTestId("mode-mock"));
+    await userEvent.selectOptions(screen.getByTestId("mode-select"), "mock");
     await waitFor(() => expect(screen.getByTestId("mode-banner")).toHaveTextContent(/^MOCK:/));
     expect(screen.queryByTestId("trace")).toBeNull();
     expect(screen.queryByTestId("token-label")).toBeNull();
