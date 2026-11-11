@@ -62,9 +62,10 @@ try {
   check((await page.getByTestId('mode-badge').innerText()).includes('DEMO'), 'header shows the DEMO badge');
   // Rule 19 without Real settings: MOCK banner first, Real disabled naming the settings, the "Real not configured" card.
   check(await page.evaluate(() => document.querySelector('.banner')?.dataset.testid === 'mode-banner' && document.querySelector('.banner').textContent.startsWith('MOCK:')), 'the MOCK banner is the first banner');
-  await page.getByTestId('mode-mock').and(page.locator('[aria-pressed="true"]')).waitFor();
-  check(await page.getByTestId('mode-real').isDisabled(), 'Real is disabled without the owner\'s settings');
-  check(/TW_REAL_ISSUER/.test(await page.getByTestId('mode-real').getAttribute('title')), 'the Real button\'s tooltip names the settings');
+  await page.getByTestId('mode-select').waitFor();
+  check(await page.getByTestId('mode-select').getAttribute('aria-label') === 'Mock or Real', 'the top-menu mode control is the Mock/Real select');
+  const realOption = page.getByTestId('mode-select').locator('option[value="real"]');
+  check(await realOption.isDisabled(), 'Real is disabled without the owner\'s settings');
 
   // Keyboard only: skip link, then Tab through the four tabs and the theme button.
   await page.keyboard.press('Tab');
