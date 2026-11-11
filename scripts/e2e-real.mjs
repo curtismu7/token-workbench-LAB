@@ -69,7 +69,7 @@ try {
     await page.getByTestId('mode-banner').filter({ hasText: 'REAL:' }).waitFor();
     check(await page.evaluate(() => document.querySelector('.banner')?.dataset.state === 'live'), `${tag} the REAL banner is first and marked live`);
     check((await page.getByTestId('mode-badge').innerText()).startsWith('REAL'), `${tag} the header badge says REAL`);
-    check((await page.getByTestId('mode-real').getAttribute('aria-pressed')) === 'true', `${tag} the toggle shows Real pressed`);
+    check((await page.getByTestId('mode-select').inputValue()) === 'real', `${tag} the mode control shows Real`);
     await page.getByRole('button', { name: 'REAL client_credentials token' }).click();
     await page.getByTestId('trace').waitFor();
     check((await page.getByTestId('token-label').innerText()) === 'REAL', `${tag} the issued token is labelled REAL`);
@@ -93,11 +93,11 @@ try {
     check(await page.getByTestId('real-note').first().isVisible(), `${tag} the tester says it has no Real version`);
     const html = await page.content();
     check(secretForms.every((f) => !html.includes(f)), `${tag} the client secret is nowhere in the page`);
-    await page.getByTestId('mode-mock').click();
+    await page.getByTestId('mode-select').selectOption('mock');
     await page.getByTestId('mode-banner').filter({ hasText: 'MOCK:' }).waitFor();
     await page.getByRole('button', { name: 'Decode / Trace', exact: true }).click();
     check((await page.getByTestId('trace').count()) === 0 && (await page.getByRole('button', { name: 'DPoP-bound' }).count()) === 1, `${tag} switching to Mock clears the REAL trace and brings back the stub samples`);
-    await page.getByTestId('mode-real').click();
+    await page.getByTestId('mode-select').selectOption('real');
     await page.getByTestId('mode-banner').filter({ hasText: 'REAL:' }).waitFor();
     check(true, `${tag} switching back to Real works without a restart`);
     check(offOrigin.length === 0, `${tag} the browser made no off-origin request ${JSON.stringify(offOrigin)}`);
