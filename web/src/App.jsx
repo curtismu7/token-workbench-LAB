@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import ShelfLink from "./components/ShelfLink.jsx";
-import { getHealth, getInfo, getMeta, setMode } from "./lib/api.js";
+import { getHealth, getInfo, getMeta, postReset, setMode } from "./lib/api.js";
 import Decode from "./components/Decode.jsx";
 import Tester from "./components/Tester.jsx";
 import Checker from "./components/Checker.jsx";
@@ -48,6 +48,10 @@ export default function App() {
   const onSelectMode = async (source) => {
     try { setInfo(await setMode(source)); setMessage(`Mode: ${source === "real" ? "Real" : "Mock"}.`); } catch (e) { setMessage(e.message); }
   };
+  // Reset (rule 3): the server drops every non-default workspace's runtime state; the tabs re-key on the source.
+  const onReset = async () => {
+    try { const r = await postReset(); setMessage(r?.note ? `Reset: ${r.note}` : "Reset: the lab's runtime state is back to defaults."); } catch (e) { setMessage(e.message); }
+  };
 
   const real = info?.source === "real";
   const key = info?.source || "mock";
@@ -68,6 +72,7 @@ export default function App() {
           theme={{ value: theme, onChange: setTheme }}
           help={{ href: "https://github.com/curtismu7/token-workbench-LAB#readme" }}
           version={info?.version || null}
+          onReset={onReset}
           talkTrack={{ active: tab === "talk", onToggle: () => { setTab("talk"); setMessage(""); } }}
         >
           <ShelfLink headers={() => ({ "X-Workspace-Id": workspaceId() })} />

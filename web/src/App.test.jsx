@@ -178,7 +178,7 @@ describe("flow catalog tab", () => {
     await userEvent.click(screen.getByRole("button", { name: "Simulate" }));
     await waitFor(() => expect(caption).toHaveTextContent("Step 1 of 2"));
     await waitFor(() => expect(caption).toHaveTextContent(/Attack blocked: refused/), { timeout: 3000 });
-    await userEvent.click(screen.getByRole("button", { name: "Reset" }));
+    await userEvent.click(screen.getAllByRole("button", { name: "Reset" }).pop());
     expect(caption).toHaveTextContent("Press Simulate");
   });
 

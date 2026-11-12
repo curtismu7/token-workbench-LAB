@@ -36,6 +36,7 @@ export const getHealth = () => call("/api/health");
 export const getMeta = () => call("/api/meta");
 export const getInfo = () => call("/api/info");
 export const setMode = (source) => call("/api/mode", "POST", { source });
+export const postReset = () => call("/api/reset", "POST");
 export const postMint = (sample) => call("/api/mint", "POST", { sample });
 export const postDecode = (token, verify) => call("/api/decode", "POST", { token, verify });
 export const postIntrospect = (token) => call("/api/introspect", "POST", { token });
