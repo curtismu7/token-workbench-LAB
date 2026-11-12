@@ -6,6 +6,7 @@ import Tester from "./components/Tester.jsx";
 import Checker from "./components/Checker.jsx";
 import Flows from "./components/Flows.jsx";
 import Story from "./components/Story.jsx";
+import TalkTrack from "./components/TalkTrack.jsx";
 import TopMenu from "./top-menu/TopMenu";
 import RealStatus from "./components/RealStatus.jsx";
 import { workspaceId } from "./lib/api.js";
@@ -19,7 +20,7 @@ const initialTheme = () => {
   return ["auto", "light", "dark"].includes(t) ? t : "auto";
 };
 
-export const TABS = [["decode", "Decode / Trace"], ["tester", "Wrong-token tester"], ["checker", "Profile checker"], ["flows", "Flow catalog"]];
+export const TABS = [["decode", "Decode / Trace"], ["tester", "Wrong-token tester"], ["checker", "Profile checker"], ["flows", "Flow catalog"], ["talk", "Talk track"]];
 
 // Real mode on a tab that has no Real version: say so, every time.
 const StubsOnly = () => <p className="callout-text" data-testid="real-note">No Real version of this tab: it always runs against the in-process stubs, so its results are MOCK even while the header says Real.</p>;
@@ -67,6 +68,7 @@ export default function App() {
           theme={{ value: theme, onChange: setTheme }}
           help={{ href: "https://github.com/curtismu7/token-workbench-LAB#readme" }}
           version={info?.version || null}
+          talkTrack={{ active: tab === "talk", onToggle: () => { setTab("talk"); setMessage(""); } }}
         >
           <ShelfLink headers={() => ({ "X-Workspace-Id": workspaceId() })} />
           <ReturnLink app="token-workbench" variant="header" />
@@ -87,6 +89,7 @@ export default function App() {
         <div hidden={tab !== "tester"}>{real && <StubsOnly />}<Tester key={key} announce={setMessage} /></div>
         <div hidden={tab !== "checker"}><Checker key={key} source={key} issuer={info?.real?.issuer} announce={setMessage} /></div>
         {tab === "flows" && <>{real && <StubsOnly />}<Flows theme={theme} announce={setMessage} /></>}
+        {tab === "talk" && <TalkTrack />}
         <Story active={tab} />
       </main>
     </>

@@ -21,7 +21,9 @@ describe("hosted and simulated banner (MODE=se-mock)", () => {
     render(<App />);
     expect(await screen.findByTestId("hosted-banner")).toHaveTextContent(BANNER);
     for (const [, label] of TABS) {
-      await userEvent.click(screen.getByRole("button", { name: label }));
+      // The TopMenu talk-track toggle shares the "Talk track" name; tabs are the buttons in the nav.
+      const tabsNav = screen.getByRole("navigation", { name: "Tools" });
+      await userEvent.click([...tabsNav.querySelectorAll("button")].find((b) => b.textContent === label));
       expect(screen.getByTestId("hosted-banner")).toHaveTextContent(/^HOSTED SIMULATION/);
     }
   });

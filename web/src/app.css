@@ -101,3 +101,6 @@ summary { cursor: pointer; font-weight: 700; color: var(--status-info); }
 .trace > li { padding: 0.6rem 0.75rem; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); overflow-wrap: anywhere; }
 .trace code { overflow-wrap: anywhere; }
 [data-testid="real-status"] th.mono { white-space: nowrap; }
+
+.talk { max-width: 52rem; }
+.talk__step { padding-left: 8px; border-left: 3px solid var(--accent); }
