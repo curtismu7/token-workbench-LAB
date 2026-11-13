@@ -169,7 +169,7 @@ try {
   await page.getByTestId('caption').filter({ hasText: /Attack succeeded/ }).waitFor({ timeout: 15000 });
   check(true, 'without protection the same attack succeeds');
   await shot('4-flows-light');
-  await page.getByRole('button', { name: 'Reset', exact: true }).click();
+  await page.getByRole('button', { name: 'Reset', exact: true }).last().click();
   check((await page.getByTestId('caption').innerText()).includes('Press Simulate') && (await page.locator('.fbox.on').count()) === 0, 'Reset clears the diagram');
   await tab('Flow catalog').click();
 
