@@ -33,24 +33,55 @@ export function decodeJwt(raw) {
 // nothing is ever served there.
 export const realSigninRedirectUri = 'https://local.ping-devops.com:8443/token-workbench/auth/callback';
 
-// Optional settings on top of the client_credentials config: the sign-in is available only when the user client is
-// configured. Names only, never values.
+// Optional settings on top of the client_credentials config: the sign-in is available when at least one provider is
+// configured. PingOne: a user client on the same environment as TW_REAL_ISSUER. PingFederate: its base URL and user
+// client (its endpoints are /as/authorization.oauth2 and /as/token.oauth2, driven by discovery). Names only, never values.
 export function realSigninFrom(config, env = process.env) {
-  const clientId = String(env.TW_REAL_3LO_CLIENT_ID || '');
-  const secret = String(env.TW_REAL_3LO_CLIENT_SECRET || '');
+  const p1ClientId = String(env.TW_REAL_3LO_CLIENT_ID || '');
+  const p1Secret = String(env.TW_REAL_3LO_CLIENT_SECRET || '');
   const username = String(env.TW_REAL_USERNAME || 'demouser');
-  const problems = [];
-  if (!clientId) problems.push('TW_REAL_3LO_CLIENT_ID is not set');
-  else if (!/^[\x21-\x7e]{1,256}$/.test(clientId)) problems.push('TW_REAL_3LO_CLIENT_ID must be printable ASCII with no spaces');
-  if (!secret) problems.push('TW_REAL_3LO_CLIENT_SECRET is not set');
-  else if (secret.length > 1024 || CONTROL.test(secret)) problems.push('TW_REAL_3LO_CLIENT_SECRET must be 1 to 1024 characters with no control characters (value not shown)');
-  if (!plain(username, 200)) problems.push('TW_REAL_USERNAME must be 1 to 200 characters with no control characters');
-  return { available: config.available && problems.length === 0, problems, username, clientIdSet: Boolean(clientId), secretSet: Boolean(secret), signinAvailable: problems.length === 0, signinProblems: problems, signinUsername: username, signinClientId: clientId, signinSecret: secret, signinRedirectUri: realSigninRedirectUri };
+  const pfBase = String(env.TW_REAL_PF_BASE_URL || '');
+  const pfClientId = String(env.TW_REAL_PF_CLIENT_ID || '');
+  const pfSecret = String(env.TW_REAL_PF_CLIENT_SECRET || '');
+  const pfRedirect = String(env.TW_REAL_PF_REDIRECT_URI || realSigninRedirectUri);
+  const p1Problems = [];
+  if (!p1ClientId) p1Problems.push('TW_REAL_3LO_CLIENT_ID is not set');
+  else if (!/^[\x21-\x7e]{1,256}$/.test(p1ClientId)) p1Problems.push('TW_REAL_3LO_CLIENT_ID must be printable ASCII with no spaces');
+  if (!p1Secret) p1Problems.push('TW_REAL_3LO_CLIENT_SECRET is not set');
+  else if (p1Secret.length > 1024 || CONTROL.test(p1Secret)) p1Problems.push('TW_REAL_3LO_CLIENT_SECRET must be 1 to 1024 characters with no control characters (value not shown)');
+  const pfProblems = [];
+  if (!pfBase) pfProblems.push('TW_REAL_PF_BASE_URL is not set');
+  else {
+    let u = null;
+    try { u = new URL(pfBase); } catch { /* named below */ }
+    if (!u || u.search || u.hash) pfProblems.push('TW_REAL_PF_BASE_URL must be a URL with no query or fragment');
+    else if (u.protocol === 'http:' && !/^127\.0\.0\.1$|^localhost$/.test(u.hostname)) pfProblems.push('TW_REAL_PF_BASE_URL must be https (http only to a loopback test fake)');
+  }
+  if (!pfClientId) pfProblems.push('TW_REAL_PF_CLIENT_ID is not set');
+  if (!pfSecret) pfProblems.push('TW_REAL_PF_CLIENT_SECRET is not set');
+  else if (pfSecret.length > 1024 || CONTROL.test(pfSecret)) pfProblems.push('TW_REAL_PF_CLIENT_SECRET must be 1 to 1024 characters with no control characters (value not shown)');
+  if (!plain(username, 200)) p1Problems.push('TW_REAL_USERNAME must be 1 to 200 characters with no control characters');
+  const p1Ok = config.available && p1Problems.length === 0;
+  const pfOk = config.available && pfProblems.length === 0;
+  const problems = [...(p1Ok ? [] : p1Problems), ...(pfOk ? [] : pfProblems)];
+  return {
+    available: p1Ok || pfOk,
+    problems,
+    username, signinUsername: username,
+    // The providers the page may pick from, in the toggle order.
+    providers: [p1Ok ? { id: 'pingone', label: 'PingOne', clientIdSet: true } : null, pfOk ? { id: 'pingfederate', label: 'PingFederate', clientIdSet: true } : null].filter(Boolean),
+    pingone: { ok: p1Ok, problems: p1Problems, clientId: p1ClientId, secret: p1Secret },
+    pingfederate: { ok: pfOk, problems: pfProblems, base: pfOk ? pfBase.replace(/\/+$/, '') : null, clientId: pfClientId, secret: pfSecret, redirectUri: pfRedirect },
+  };
 }
 
 export const REAL_SIGNIN_SETTINGS = [
-  { name: 'TW_REAL_3LO_CLIENT_ID', required: false, about: 'for Sign in: a client allowed the authorization-code and refresh-token grants' },
+  { name: 'TW_REAL_3LO_CLIENT_ID', required: false, about: 'PingOne sign-in: a client allowed the authorization-code and refresh-token grants' },
   { name: 'TW_REAL_3LO_CLIENT_SECRET', required: false, about: 'that client\'s secret (write-only: never shown or logged)' },
+  { name: 'TW_REAL_PF_BASE_URL', required: false, about: 'PingFederate sign-in: its base URL as in /.well-known/openid-configuration' },
+  { name: 'TW_REAL_PF_CLIENT_ID', required: false, about: 'the PingFederate user client' },
+  { name: 'TW_REAL_PF_CLIENT_SECRET', required: false, about: 'its secret (write-only: never shown or logged)' },
+  { name: 'TW_REAL_PF_REDIRECT_URI', required: false, about: 'the redirect URI the PingFederate client lists (default the lab-proxy callback)' },
   { name: 'TW_REAL_USERNAME', required: false, about: 'the user who signs in (default demouser); the password is typed in the dialog' },
 ];
 
@@ -59,13 +90,19 @@ export class SignInError extends Error {
 }
 
 // One sign-in session per workspace: the three tokens and the step trace. The password is never here.
+// Each call names its provider: 'pingone' (pi.flow + flows API) or 'pingfederate' (pi.flow against /as/*; the
+// endpoints come from discovery). Both share the OAuth ceremony; only the password step and paths differ.
 export function createRealSignin({ config, guard, now = Date.now }) {
-  const sessions = new Map(); // workspace -> { access, idToken, refresh, header, claims, idClaims, expiresAt, steps }
+  const sessions = new Map(); // workspace -> { access, idToken, refresh, header, claims, idClaims, expiresAt, steps, provider }
   let inFlight = 0;
   const scrub = (t) => config.scrub(t);
 
-  const basicValue = Buffer.from(`${encodeURIComponent(config.signinClientId)}:${encodeURIComponent(config.signinSecret)}`).toString('base64');
-  const auth = () => ({ headers: { authorization: `Basic ${basicValue}` }, shown: { headers: { authorization: SECRET_SHOWN } } });
+  const providerCfg = (provider) => {
+    if (provider === 'pingone') return config.pingone?.ok ? { ok: true, clientId: config.pingone.clientId, secret: config.pingone.secret, base: config.issuer, redirectUri: realSigninRedirectUri, discovery: false } : { ok: false, problems: config.pingone?.problems || ['PingOne sign-in is not configured'] };
+    return config.pingfederate?.ok ? { ok: true, clientId: config.pingfederate.clientId, secret: config.pingfederate.secret, base: config.pingfederate.base, redirectUri: config.pingfederate.redirectUri, discovery: true } : { ok: false, problems: config.pingfederate?.problems || ['PingFederate sign-in is not configured'] };
+  };
+
+  const clientBasic = (clientId, secret) => `Basic ${Buffer.from(`${encodeURIComponent(clientId)}:${encodeURIComponent(secret)}`).toString('base64')}`;
 
   // After the password has been sent, the issuer's free text is never passed on (it could echo what was typed): codes only.
   const errorOf = (r, sent) => {
@@ -96,10 +133,12 @@ export function createRealSignin({ config, guard, now = Date.now }) {
     return s;
   };
 
-  // password: what the person typed. Returns the three tokens raw plus the trace, or throws SignInError.
-  async function signIn(ws, password) {
+  // password: what the person typed. provider: 'pingone' or 'pingfederate' (default pingone). Returns the three
+  // tokens raw plus the trace, or throws SignInError.
+  async function signIn(ws, password, provider = 'pingone') {
     if (!config.available) throw new SignInError('Real is not configured', []);
-    if (!config.signinAvailable) throw new SignInError(`Sign in is not configured: ${config.signinProblems.join('; ')}`, []);
+    const pc = providerCfg(provider);
+    if (!pc.ok) throw new SignInError(`Sign in is not configured: ${pc.problems.join('; ')}`, []);
     if (inFlight >= 2) throw new SignInError('two Real sign-ins are already in flight; wait for one to finish', []);
     inFlight += 1;
     const t = { entries: [] };
@@ -107,34 +146,44 @@ export function createRealSignin({ config, guard, now = Date.now }) {
     const keep = (cookies) => { for (const c of cookies) { const pair = String(c).split(';')[0]; const i = pair.indexOf('='); if (i > 0) jar.set(pair.slice(0, i).trim(), pair.slice(i + 1)); } };
     const cookieHeader = () => [...jar].map(([k, v]) => `${k}=${v}`).join('; ');
     const shownCookie = () => [...jar].map(([k, v]) => `${k}=${short(v)}`).join('; ');
+    const label = provider === 'pingfederate' ? 'PingFederate' : 'PingOne';
     let sent = false;
     const scrubTyped = (v) => (typeof password === 'string' && password.length >= 4 ? JSON.parse(JSON.stringify(v).split(JSON.stringify(password).slice(1, -1)).join('[the password]')) : v);
     try {
+      // 0. PingFederate: discovery once for the authorize and token endpoints (the origin is already netguard-checked).
+      let authorizePath = '/as/authorize'; let tokenPath = '/as/token';
+      if (pc.discovery) {
+        const d = await idp(t, `discovery (${label})`, `${pc.base}/.well-known/openid-configuration`, { headers: { accept: 'application/json' } });
+        if (d.status !== 200 || typeof d.json?.authorization_endpoint !== 'string' || typeof d.json?.token_endpoint !== 'string') throw new SignInError(`could not read ${label}'s discovery document (HTTP ${d.status})`, t.entries);
+        const au = new URL(d.json.authorization_endpoint); const tu = new URL(d.json.token_endpoint);
+        if (au.origin !== new URL(pc.base).origin || tu.origin !== new URL(pc.base).origin) throw new SignInError(`${label}'s discovery names endpoints on another host; the lab refuses it`, t.entries);
+        authorizePath = au.pathname; tokenPath = tu.pathname;
+      }
       // 1. authorize with response_mode=pi.flow: the answer is JSON (a flow), not a redirect.
       const verifier = randomBytes(32).toString('base64url');
       const state = randomBytes(12).toString('base64url');
       const nonce = randomBytes(12).toString('base64url');
-      const query = { response_type: 'code', client_id: config.signinClientId, redirect_uri: config.signinRedirectUri, scope: SIGN_IN_SCOPES, response_mode: 'pi.flow', code_challenge: createHash('sha256').update(verifier).digest('base64url'), code_challenge_method: 'S256', state, nonce };
-      const a = await idp(t, 'authorize (response_mode=pi.flow, PKCE S256)', `${config.issuer}/as/authorize?${new URLSearchParams(query)}`, { headers: { accept: 'application/json' }, shownBody: { query: { ...query, state: short(state), nonce: short(nonce) } } });
+      const query = { response_type: 'code', client_id: pc.clientId, redirect_uri: pc.redirectUri, scope: SIGN_IN_SCOPES, response_mode: 'pi.flow', code_challenge: createHash('sha256').update(verifier).digest('base64url'), code_challenge_method: 'S256', state, nonce };
+      const a = await idp(t, `authorize (${label}, response_mode=pi.flow, PKCE S256)`, `${pc.base}${authorizePath}?${new URLSearchParams(query)}`, { headers: { accept: 'application/json' }, shownBody: { query: { ...query, state: short(state), nonce: short(nonce) } } });
       keep(a.cookies);
-      if (a.redirect) throw new SignInError('the issuer answered the sign-in with a redirect; the lab never follows one', t.entries);
-      if (a.status !== 200 || !a.json || !FLOW_ID.test(String(a.json.id || ''))) throw new SignInError(`the issuer refused to start the sign-in (HTTP ${a.status})`, t.entries);
+      if (a.redirect) throw new SignInError(`${label} answered the sign-in with a redirect; the lab never follows one`, t.entries);
+      if (a.status !== 200 || !a.json || !FLOW_ID.test(String(a.json.id || ''))) throw new SignInError(`${label} refused to start the sign-in (HTTP ${a.status})`, t.entries);
       let flow = a.json;
       const flowId = a.json.id;
-      if (flow.status !== 'USERNAME_PASSWORD_REQUIRED' && flow.status !== 'COMPLETED') throw new SignInError('the issuer asked for a sign-in step this lab does not drive (only username and password). Check the sign-on policy.', t.entries);
-      // 2. username and password, once, through the flows API.
+      if (flow.status !== 'USERNAME_PASSWORD_REQUIRED' && flow.status !== 'COMPLETED') throw new SignInError(`${label} asked for a sign-in step this lab does not drive (only username and password). Check the sign-on policy.`, t.entries);
+      // 2. username and password, once, through the flows API (PingOne-shaped on both providers).
       if (flow.status === 'USERNAME_PASSWORD_REQUIRED') {
         if (!plain(password, 256)) throw new SignInError('type the password (1 to 256 characters)', t.entries);
         sent = true;
-        const r = await idp(t, 'flows API: username and password', `${config.issuer}/flows/${flowId}`, {
+        const r = await idp(t, `flows API: username and password (${label})`, `${pc.base}/flows/${flowId}`, {
           method: 'POST',
           headers: { 'content-type': PW_TYPE, accept: '*/*', ...(jar.size ? { cookie: cookieHeader() } : {}) },
           body: JSON.stringify({ username: config.signinUsername, password }),
           shownBody: { username: config.signinUsername, password: PASSWORD_SHOWN },
         });
         keep(r.cookies);
-        if (r.status === 400 || r.status === 401) throw new SignInError('the issuer did not accept the username or password', t.entries);
-        if (r.status !== 200 || !r.json) throw new SignInError(`the issuer refused the sign-in (HTTP ${r.status})`, t.entries);
+        if (r.status === 400 || r.status === 401) throw new SignInError(`${label} did not accept the username or password`, t.entries);
+        if (r.status !== 200 || !r.json) throw new SignInError(`${label} refused the sign-in (HTTP ${r.status})`, t.entries);
         flow = r.json;
         if (flow.status !== 'COMPLETED') throw new SignInError('the issuer asked for a step after the password that this lab does not drive (for example MFA). Check the sign-on policy.', t.entries);
       }
@@ -142,27 +191,26 @@ export function createRealSignin({ config, guard, now = Date.now }) {
       let code = str(flow.authorizeResponse?.code, 2000);
       let gotState = flow.authorizeResponse?.state;
       if (!code) {
-        const r = await idp(t, 'resume: the authorization code', `${config.issuer}/as/resume?flowId=${encodeURIComponent(flowId)}`, { headers: { accept: 'application/json', ...(jar.size ? { cookie: cookieHeader() } : {}) }, shownHeaders: { accept: 'application/json', cookie: shownCookie() } });
+        const r = await idp(t, 'resume: the authorization code', `${pc.base}/as/resume?flowId=${encodeURIComponent(flowId)}`, { headers: { accept: 'application/json', ...(jar.size ? { cookie: cookieHeader() } : {}) }, shownHeaders: { accept: 'application/json', cookie: shownCookie() } });
         code = str(r.json?.authorizeResponse?.code, 2000); gotState = r.json?.authorizeResponse?.state;
-        if (r.status !== 200 || !code) throw new SignInError(`the issuer did not hand back an authorization code (HTTP ${r.status})`, t.entries);
+        if (r.status !== 200 || !code) throw new SignInError(`${label} did not hand back an authorization code (HTTP ${r.status})`, t.entries);
       }
       if (gotState !== state) throw new SignInError('the authorization code came back without the state the lab sent; the lab refuses it', t.entries);
       // 4. the code for the three tokens (the client's secret in the Authorization header only).
-      const a2 = auth();
-      const form = { grant_type: 'authorization_code', code, code_verifier: verifier, redirect_uri: config.signinRedirectUri };
-      const shownForm = { grant_type: 'authorization_code', code: short(code), code_verifier: '[the PKCE verifier, never shown]', redirect_uri: config.signinRedirectUri };
-      const tok = await idp(t, "token: the code for the user's tokens", `${config.issuer}/as/token`, {
-        method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded', accept: 'application/json', ...a2.headers }, shownHeaders: { 'content-type': 'application/x-www-form-urlencoded', ...a2.shown.headers }, body: new URLSearchParams(form).toString(), shownBody: shownForm,
+      const form = { grant_type: 'authorization_code', code, code_verifier: verifier, redirect_uri: pc.redirectUri };
+      const shownForm = { grant_type: 'authorization_code', code: short(code), code_verifier: '[the PKCE verifier, never shown]', redirect_uri: pc.redirectUri };
+      const tok = await idp(t, `token: the code for the user's tokens (${label})`, `${pc.base}${tokenPath}`, {
+        method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded', accept: 'application/json', authorization: clientBasic(pc.clientId, pc.secret) }, shownHeaders: { 'content-type': 'application/x-www-form-urlencoded', authorization: SECRET_SHOWN }, body: new URLSearchParams(form).toString(), shownBody: shownForm,
       });
       const at = typeof tok.json?.access_token === 'string' ? tok.json.access_token : null;
       const rt = typeof tok.json?.refresh_token === 'string' ? tok.json.refresh_token : null;
-      if (tok.status !== 200 || !at) throw new SignInError(`the issuer did not issue the user's tokens (HTTP ${tok.status})`, t.entries);
+      if (tok.status !== 200 || !at) throw new SignInError(`${label} did not issue the user's tokens (HTTP ${tok.status})`, t.entries);
       const idToken = typeof tok.json.id_token === 'string' ? tok.json.id_token : null;
       const idClaims = idToken ? decodeJwt(idToken)?.claims ?? null : null;
       if (idClaims && idClaims.nonce !== nonce) throw new SignInError('the ID token does not carry the nonce the lab sent; the lab refuses it', t.entries);
       const dec = decodeJwt(at);
       const life = Number.isFinite(tok.json.expires_in) && tok.json.expires_in > 0 ? Math.min(tok.json.expires_in, 24 * 3600) : 3600;
-      const session = { access: at, idToken, refresh: rt, header: dec?.header ?? null, claims: dec?.claims ?? null, idClaims, expiresAt: now() + life * 1000, steps: scrubTyped(t.entries) };
+      const session = { access: at, idToken, refresh: rt, header: dec?.header ?? null, claims: dec?.claims ?? null, idClaims, expiresAt: now() + life * 1000, steps: scrubTyped(t.entries), provider };
       sessions.set(ws, session);
       return { ok: true, tokens: tokensOf(session), trace: session.steps };
     } catch (e) {
@@ -171,15 +219,26 @@ export function createRealSignin({ config, guard, now = Date.now }) {
     } finally { inFlight -= 1; }
   }
 
-  // grant_type=refresh_token: a new access (and ID) token. The refresh token itself is only sent, never shown in a trace.
+  // grant_type=refresh_token: a new access (and ID) token. The refresh token itself is only sent, never shown in a
+  // trace. The session remembers which provider issued it.
   async function refresh(ws) {
     const s = sessionOf(ws);
     if (!s) throw new SignInError('no sign-in session: Sign in first', []);
     if (!s.refresh) throw new SignInError('the issuer issued no refresh token, so there is nothing to exchange', []);
+    const pc = providerCfg(s.provider);
+    if (!pc.ok) throw new SignInError(`Sign in is not configured: ${pc.problems.join('; ')}`, []);
+    const label = s.provider === 'pingfederate' ? 'PingFederate' : 'PingOne';
     const t = { entries: [] };
-    const a = auth();
-    const tok = await idp(t, 'token (refresh_token)', `${config.issuer}/as/token`, {
-      method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded', accept: 'application/json', ...a.headers }, shownHeaders: { 'content-type': 'application/x-www-form-urlencoded', ...a.shown.headers },
+    let tokenPath = '/as/token';
+    if (pc.discovery) {
+      const d = await idp(t, `discovery (${label})`, `${pc.base}/.well-known/openid-configuration`, { headers: { accept: 'application/json' } });
+      if (d.status !== 200 || typeof d.json?.token_endpoint !== 'string') throw new SignInError(`could not read ${label}'s discovery document (HTTP ${d.status})`, t.entries);
+      const tu = new URL(d.json.token_endpoint);
+      if (tu.origin !== new URL(pc.base).origin) throw new SignInError(`${label}'s discovery names a token endpoint on another host; the lab refuses it`, t.entries);
+      tokenPath = tu.pathname;
+    }
+    const tok = await idp(t, `token (refresh_token, ${label})`, `${pc.base}${tokenPath}`, {
+      method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded', accept: 'application/json', authorization: clientBasic(pc.clientId, pc.secret) }, shownHeaders: { 'content-type': 'application/x-www-form-urlencoded', authorization: SECRET_SHOWN },
       body: new URLSearchParams({ grant_type: 'refresh_token', refresh_token: s.refresh }).toString(),
       shownBody: { grant_type: 'refresh_token', refresh_token: REFRESH_SHOWN },
     });
@@ -200,8 +259,13 @@ export function createRealSignin({ config, guard, now = Date.now }) {
   ]);
 
   return {
-    available: () => config.available && config.signinAvailable,
-    problems: () => config.signinProblems,
+    available: () => Boolean(config.available && config.providers?.length),
+    providers: () => (config.available ? config.providers || [] : []),
+    problems: () => {
+      if (!config.available) return ['Real is not configured'];
+      if (config.providers?.length) return [];
+      return ['no sign-in provider is configured: ' + (config.pingone?.problems || []).concat(config.pingfederate?.problems || []).join('; ')];
+    },
     username: () => config.signinUsername,
     session: sessionOf,
     signIn, refresh,

@@ -95,7 +95,7 @@ export default function App() {
       <main id="main" tabIndex={-1} className="page">
         <div role="status" aria-live="polite" className="live" data-testid="live">{message}</div>
         <RealStatus info={info} />
-        <div hidden={tab !== "decode"}><Decode key={key} source={key} announce={setMessage} /></div>
+        <div hidden={tab !== "decode"}><Decode key={key} source={key} announce={setMessage} signinProviders={info?.real?.signin?.providers || []} /></div>
         <div hidden={tab !== "tester"}>{real && <StubsOnly />}<Tester key={key} announce={setMessage} /></div>
         <div hidden={tab !== "checker"}><Checker key={key} source={key} issuer={info?.real?.issuer} announce={setMessage} /></div>
         {tab === "flows" && <>{real && <StubsOnly />}<Flows theme={theme} announce={setMessage} /></>}

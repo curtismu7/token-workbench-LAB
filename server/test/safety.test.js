@@ -160,7 +160,7 @@ test('the netguard is the only door to a real host, and only app.js and doctor.j
   const importers = sources().filter((f) => /from '\.\/netguard\.js'/.test(fs.readFileSync(f, 'utf8'))).map((f) => path.relative(srcDir, f)).sort();
   assert.deepEqual(importers, ['app.js', 'doctor.js']);
   const ng = fs.readFileSync(path.join(srcDir, 'netguard.js'), 'utf8');
-  assert.match(ng, /redirect: 'manual'/); assert.match(ng, /AbortSignal\.timeout/); assert.match(ng, /url\.origin !== allowedOrigin/);
+  assert.match(ng, /redirect: 'manual'/); assert.match(ng, /AbortSignal\.timeout/); assert.match(ng, /origins\.includes\(url\.origin\)/);
 });
 
 test('the checker never builds a credential header', () => {

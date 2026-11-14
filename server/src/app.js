@@ -62,11 +62,18 @@ export function createApp({ runtime, health = createHealth(), webDist = DEFAULT_
   // Real when configured, else Mock. The netguard refuses every outbound call unless the mode is Real.
   const realOk = !hosted && real.available;
   let source = realOk ? 'real' : 'mock';
-  const guard = createNetguard({ mode: () => source, allowedOrigin: realOk ? real.origin : null, ...(realFetch ? { realFetch } : {}) });
+  const guard = createNetguard({ mode: () => source, allowedOrigin: realOk ? [real.origin, ...(signin ? [signin.pingfederate?.base].filter(Boolean).map((b) => new URL(b).origin) : [])] : null, ...(realFetch ? { realFetch } : {}) });
   const realClient = createRealClient({ config: real, guard });
   // Real sign-in (authorization code + PKCE + pi.flow): same netguard, same issuer origin. `signin` is the extra
-  // sign-in config (realSigninFrom); the client is always built so /api/info can report availability.
-  const signinClient = createRealSignin({ config: { ...real, ...signin }, guard });
+  // sign-in config (realSigninFrom: providers, per-provider clients); the client is always built so /api/info can
+  // report availability. The merge keeps real's non-enumerable members (scrub, auth, clientId): a plain spread would
+  // silently drop them.
+  const signinConfig = Object.defineProperties({ ...real, ...signin }, {
+    scrub: { value: real.scrub, enumerable: false },
+    auth: { value: real.auth, enumerable: false },
+    clientId: { value: real.clientId, enumerable: false },
+  });
+  const signinClient = createRealSignin({ config: signinConfig, guard });
   health.setRuntime?.(() => (source === 'real' ? 'live' : 'offline'));
   // Every Real answer (result, error message, trace) leaves through here: the whole JSON is scrubbed of the client
   // secret in every encoding, so an issuer that echoes it (in a message, a header, even a token field) cannot leak it.
@@ -153,9 +160,10 @@ export function createApp({ runtime, health = createHealth(), webDist = DEFAULT_
   // --- Real sign-in (authorization code + PKCE + pi.flow): access, ID and refresh tokens ---
   api.post('/signin', wrap(async (req, res) => {
     if (source !== 'real') return bad(res, 'Sign in is Real only: switch to Real first', 409, 'not_real_mode');
-    const b = takeBody(req, res, ['password']); if (!b) return;
+    const b = takeBody(req, res, ['password', 'provider']); if (!b) return;
     if (typeof b.password !== 'string') return bad(res, 'password must be a string');
-    const r = await signinClient.signIn(req.workspaceId, b.password);
+    if (b.provider !== undefined && !['pingone', 'pingfederate'].includes(b.provider)) return bad(res, 'provider must be pingone or pingfederate');
+    const r = await signinClient.signIn(req.workspaceId, b.password, b.provider || 'pingone');
     return sendReal(res, { source: 'real', ...r });
   }));
   api.post('/signin/refresh', wrap(async (req, res) => {
@@ -171,7 +179,7 @@ export function createApp({ runtime, health = createHealth(), webDist = DEFAULT_
     if (source !== 'real') return res.json({ signedIn: false });
     const s = signinClient.session(req.workspaceId);
     if (!s) return res.json({ signedIn: false });
-    return sendReal(res, { signedIn: true, username: signinClient.username(), expiresAt: new Date(s.expiresAt).toISOString() });
+    return sendReal(res, { signedIn: true, username: signinClient.username(), provider: s.provider === 'pingfederate' ? 'pingfederate' : 'pingone', expiresAt: new Date(s.expiresAt).toISOString() });
   }));
 
   api.post('/decode', wrap(async (req, res) => {
@@ -269,7 +277,7 @@ export function createApp({ runtime, health = createHealth(), webDist = DEFAULT_
     if (err instanceof TargetRefused) return res.status(400).json({ error: 'target_refused', reason: err.reason, message: err.message });
     if (err instanceof URIError || err.status === 400) return bad(res, 'malformed request');
     // Log the error class only: a message could echo part of a token.
-    console.error('[token-workbench] api error:', err?.name || 'Error', err?.code || '', err?.message || '');
+    console.error('[token-workbench] api error:', err?.name || 'Error', err?.code || '');
     return res.status(500).json({ error: 'server_error' });
   });
   app.get('/api/shelf', (_req, res) => { res.set('Cache-Control', 'no-store'); res.json(shelfInfo()); }); // the header "Shelf" button

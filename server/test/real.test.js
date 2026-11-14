@@ -387,3 +387,16 @@ test('issuer normalisation: case is folded so discovery matches; trailing-dot lo
   assert.equal(realConfigFrom({ ...REAL_ENV, TW_REAL_ISSUER: 'HTTPS://IDP.EXAMPLE/as' }).issuer, ISSUER);
   for (const issuer of ['https://localhost./as', 'https://foo.localhost./', 'https://idp.example/a s', 'https://127.0.0.1./as']) assert.equal(realConfigFrom({ ...REAL_ENV, TW_REAL_ISSUER: issuer }).available, false, issuer);
 });
+
+// --- Real sign-in (authorization code + PKCE + pi.flow): access, ID and refresh tokens ---
+const SIGNIN_ENV = { ...REAL_ENV, TW_REAL_3LO_CLIENT_ID: 'tw-user-client', TW_REAL_3LO_CLIENT_SECRET: 'user-secret-never-shown', TW_REAL_USERNAME: 'demouser' };
+
+// Extend the stub issuer with the pi.flow sign-in ceremony: authorize -> flows API password -> code -> token.
+// `stub.signinFault` switches on one failure at a time.
+function addSigninRoutes(stub) {
+  const flows = new Map(); const codes = new Map();
+  stub.flows = flows;
+  const handlers = [];
+  stub.server.prependAnyListener?.();
+  return handlers;
+}

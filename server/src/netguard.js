@@ -11,20 +11,23 @@ export class NetguardRefused extends Error {
   constructor(reason, message) { super(message); this.name = 'NetguardRefused'; this.code = 'netguard_refused'; this.reason = reason; }
 }
 
-// mode: () => 'mock' | 'real'. allowedOrigin: the configured issuer's origin, or null when Real is not configured.
+// mode: () => 'mock' | 'real'. allowedOrigin: the configured issuer's origin (string) or the origins of every
+// configured Real target (array: the PingOne issuer and, when configured, the PingFederate base), or null when
+// Real is not configured.
 export function createNetguard({ mode, allowedOrigin = null, realFetch = globalThis.fetch, timeoutMs = TIMEOUT_MS, maxBytes = MAX_BODY_BYTES }) {
   const stats = { realCalls: 0, refused: 0 };
+  const origins = Array.isArray(allowedOrigin) ? allowedOrigin.filter(Boolean) : (allowedOrigin ? [allowedOrigin] : []);
 
   // Synchronous policy: throws NetguardRefused, returns the parsed URL when the request may go out.
   function check(target) {
     const refuse = (reason, message) => { stats.refused += 1; throw new NetguardRefused(reason, message); };
     if (mode() !== 'real') refuse('mock_mode', 'Mock mode: no real outbound calls');
-    if (!allowedOrigin) refuse('not_configured', 'Real is not configured, so no outbound call is allowed');
+    if (!origins.length) refuse('not_configured', 'Real is not configured, so no outbound call is allowed');
     let url;
     try { url = new URL(target); } catch { return refuse('bad_url', 'Not a URL'); }
     if (url.protocol !== 'https:') refuse('not_https', 'Outbound calls are https only');
     if (url.username || url.password) refuse('credentials_in_url', 'Outbound URLs must not carry credentials');
-    if (url.origin !== allowedOrigin) refuse('other_origin', 'Outbound calls may only reach the configured issuer');
+    if (!origins.includes(url.origin)) refuse('other_origin', 'Outbound calls may only reach the configured issuer(s)'); // url.origin vs the origins of every issuer this lab may call
     return url;
   }
 
@@ -61,15 +64,16 @@ export function createNetguard({ mode, allowedOrigin = null, realFetch = globalT
   function selfTest() {
     const before = { ...stats };
     const refuses = (u) => { try { check(u); return false; } catch (e) { return e instanceof NetguardRefused; } };
+    const first = origins[0] || 'https://idp.invalid/';
     const checks = [
       { name: 'a foreign origin is refused', ok: refuses('https://other-host.invalid/') },
-      { name: 'plain http is refused', ok: refuses(allowedOrigin ? allowedOrigin.replace(/^https:/, 'http:') : 'http://idp.invalid/') },
+      { name: 'plain http is refused', ok: origins.every((o) => refuses(o.replace(/^https:/, 'http:'))) || refuses(first.replace(/^https:/, 'http:')) },
     ];
-    if (mode() !== 'real') checks.push({ name: 'Mock mode refuses even the configured issuer', ok: refuses(allowedOrigin || 'https://idp.invalid/') });
+    if (mode() !== 'real') checks.push({ name: 'Mock mode refuses even the configured issuer', ok: origins.every((o) => refuses(o)) || refuses(first) });
     checks.push({ name: 'the real fetch was not called by the self-test', ok: stats.realCalls === before.realCalls });
     Object.assign(stats, before);
     return { ok: checks.every((c) => c.ok), checks };
   }
 
-  return { check, request, selfTest, stats: () => ({ ...stats }), allowedOrigin };
+  return { check, request, selfTest, stats: () => ({ ...stats }), allowedOrigin: origins.length ? origins : null };
 }

@@ -14,7 +14,8 @@ const SIG = {
 const LEVEL = { info: null, warn: ["hold", "Warning"], danger: ["deny", "Danger"] };
 
 // source: "mock" or "real" (the server's mode). The component is remounted on a switch, so state never crosses modes.
-export default function Decode({ announce, source = "mock" }) {
+// signinProviders: the configured sign-in IdPs from /api/info (PingOne, PingFederate or both).
+export default function Decode({ announce, source = "mock", signinProviders = [] }) {
   const real = source === "real";
   const [token, setToken] = useState("");
   const [label, setLabel] = useState(null); // MOCK or REAL for a minted token; null for a pasted one
@@ -32,10 +33,12 @@ export default function Decode({ announce, source = "mock" }) {
   const [pw, setPw] = useState("");
   const [showPw, setShowPw] = useState(false);
   const [signedIn, setSignedIn] = useState(false);
+  const [provider, setProvider] = useState("pingone"); // which IdP the sign-in goes to
+  const providerList = signinProviders.length ? signinProviders : [];
 
   useEffect(() => {
     if (!real) return undefined;
-    getSigninSession().then((s) => setSignedIn(!!s?.signedIn), () => {});
+    getSigninSession().then((s) => { setSignedIn(!!s?.signedIn); if (s?.provider) setProvider(s.provider); }, () => {});
     return undefined;
   }, [real]);
 
@@ -76,9 +79,9 @@ export default function Decode({ announce, source = "mock" }) {
   const doSignIn = async () => {
     setBusy(true); setError(""); setIntro(null);
     try {
-      const r = await postSignIn(pw);
+      const r = await postSignIn(pw, provider);
       setPw(""); setShowPw(false); setSignedIn(true); setUserTokens(r.tokens); setTrace(r.trace || null);
-      announce("Signed in. Access, ID and refresh tokens are ready.");
+      announce(`Signed in to ${provider === "pingfederate" ? "PingFederate" : "PingOne"}. Access, ID and refresh tokens are ready.`);
       pickUserToken(viewKind, r.tokens);
     } catch (e) { setError(e.message); setTrace(e.data?.trace || null); announce(""); } finally { setBusy(false); }
   };
@@ -114,7 +117,7 @@ export default function Decode({ announce, source = "mock" }) {
           <label htmlFor="tok" className="lbl">Token (JWT)</label>
           {label && <Badge kind={label === "REAL" ? "hold" : "info"} title={label === "REAL" ? "Issued by the configured real issuer" : "Signed by the stub issuer in this process"}><span data-testid="token-label">{label}</span></Badge>}
         </div>
-        <textarea id="tok" className="tok mono" rows={4} value={token} spellCheck={false} autoComplete="off" onChange={(e) => { setToken(e.target.value); setLabel(null); }} placeholder="eyJ..." />
+        <textarea id="tok" className="tok mono" rows={Math.max(4, token.split("\n").length + Math.ceil(token.length / 120))} value={token} spellCheck={false} autoComplete="off" onChange={(e) => { setToken(e.target.value); setLabel(null); }} placeholder="eyJ..." />
         <div className="row">
           <button type="button" className="btn primary" onClick={() => run()} disabled={busy || !token.trim()}>Decode</button>
           <label className="check"><input type="checkbox" checked={verify} onChange={(e) => setVerify(e.target.checked)} /> {real ? "Verify the signature against the issuer's real JWKS" : "Verify the signature against the stub JWKS"}</label>
@@ -128,19 +131,26 @@ export default function Decode({ announce, source = "mock" }) {
             </div>
             <div className="row" role="group" aria-label="Sign in">
               <span className="muted small">User sign-in:</span>
+              <span className="muted small" title="Which server the sign-in goes to. Only the ones configured in the lab's .env are offered.">Sign in to:</span>
+              <select aria-label="Sign-in provider" value={provider} onChange={(e) => setProvider(e.target.value)} disabled={busy || signedIn || providerList.length < 2}>
+                {(providerList.length ? providerList : [{ id: "pingone", label: "PingOne" }]).map((p) => <option key={p.id} value={p.id}>{p.label}</option>)}
+              </select>
               {signedIn ? (
                 <>
-                  <button type="button" className="btn" onClick={doRefresh} disabled={busy}>Refresh tokens</button>
-                  <button type="button" className="btn" onClick={doSignOut} disabled={busy}>Sign out</button>
+                  <button type="button" className="btn" onClick={doRefresh} disabled={busy} title="Exchanges the refresh token for a new access (and ID) token at the same server">Refresh tokens</button>
+                  <button type="button" className="btn" onClick={doSignOut} disabled={busy} title="Drops this lab's copy of the sign-in session. The issuer's tokens stay valid until they expire.">Sign out</button>
                 </>
               ) : (
                 <>
                   <input type={showPw ? "text" : "password"} className="pw mono" value={pw} autoComplete="off" spellCheck={false} placeholder="password for the sign-in" aria-label="Password for the sign-in" onChange={(e) => setPw(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && pw && !busy) doSignIn(); }} />
-                  <button type="button" className="btn" onClick={() => setShowPw((v) => !v)} aria-pressed={showPw}>{showPw ? "Hide" : "Show"}</button>
-                  <button type="button" className="btn primary" onClick={doSignIn} disabled={busy || !pw}>Sign in</button>
+                  <button type="button" className="btn" onClick={() => setShowPw((v) => !v)} aria-pressed={showPw} title="Show or hide what you typed">{showPw ? "Hide" : "Show"}</button>
+                  <button type="button" className="btn primary" onClick={doSignIn} disabled={busy || !pw} title={`Runs an authorization-code + PKCE sign-in with response_mode=pi.flow at ${provider === "pingfederate" ? "the configured PingFederate" : "the configured PingOne environment"}: the login stays in this page, no redirect. The password is sent once to the server you picked and never stored, logged or shown.`}>Sign in</button>
                 </>
               )}
             </div>
+            {!signedIn && pw && (
+              <p className="muted small">Sign in runs authorization code + PKCE with <code>response_mode=pi.flow</code> at {provider === "pingfederate" ? "PingFederate" : "PingOne"}: the login form stays in this page (no browser redirect). The password is sent once, over the trace below, never stored or shown. On success the issuer returns three tokens — access, ID and refresh — each shown raw under “View”.</p>
+            )}
             {userTokens && (
               <div className="row" role="group" aria-label="Which token to view">
                 <span className="muted small">View:</span>

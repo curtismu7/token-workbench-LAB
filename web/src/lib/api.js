@@ -42,7 +42,7 @@ export const postMint = (sample) => call("/api/mint", "POST", { sample });
 export const postDecode = (token, verify) => call("/api/decode", "POST", { token, verify });
 export const postIntrospect = (token) => call("/api/introspect", "POST", { token });
 export const getTesterCases = () => call("/api/tester/cases");
-export const postSignIn = (password) => call("/api/signin", "POST", { password });
+export const postSignIn = (password, provider) => call("/api/signin", "POST", provider ? { password, provider } : { password });
 export const postSigninRefresh = () => call("/api/signin/refresh", "POST");
 export const postSigninSignout = () => call("/api/signin/signout", "POST");
 export const getSigninSession = () => call("/api/signin/session");
