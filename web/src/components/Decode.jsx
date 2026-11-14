@@ -38,7 +38,8 @@ export default function Decode({ announce, source = "mock", signinProviders = []
 
   useEffect(() => {
     if (!real) return undefined;
-    getSigninSession().then((s) => { setSignedIn(!!s?.signedIn); if (s?.provider) setProvider(s.provider); }, () => {});
+    // While signed in the session's trace (the sign-in / refresh exchanges) stays visible across reloads.
+    getSigninSession().then((s) => { setSignedIn(!!s?.signedIn); if (s?.provider) setProvider(s.provider); if (s?.signedIn && s.trace) setTrace(s.trace); }, () => {});
     return undefined;
   }, [real]);
 
@@ -52,7 +53,7 @@ export default function Decode({ announce, source = "mock", signinProviders = []
     setBusy(true); setError(""); setIntro(null);
     try {
       const d = await postDecode(tok, v);
-      setRes(d); setDecodedAt(Date.now()); setTick(0); setTrace(d.trace || null);
+      setRes(d); setDecodedAt(Date.now()); setTick(0); setTrace(d.trace || trace);
       announce(`Decoded: ${d.claims.length} claims. ${SIG[d.signature.state][1]}.`);
     } catch (e) { setRes(null); setError(e.message); setTrace(e.data?.trace || null); announce(""); } finally { setBusy(false); }
   };
@@ -63,7 +64,7 @@ export default function Decode({ announce, source = "mock", signinProviders = []
   };
   const introspect = async () => {
     setBusy(true); setError("");
-    try { const d = await postIntrospect(token.trim()); setIntro(d); setTrace(d.trace || null); announce(`Introspection: ${d.active ? "active" : "not active"}.`); }
+    try { const d = await postIntrospect(token.trim()); setIntro(d); setTrace(d.trace || trace); announce(`Introspection: ${d.active ? "active" : "not active"}.`); }
     catch (e) { setIntro(null); setError(e.message); setTrace(e.data?.trace || null); announce(""); } finally { setBusy(false); }
   };
 
@@ -92,7 +93,10 @@ export default function Decode({ announce, source = "mock", signinProviders = []
       setUserTokens(r.tokens); setTrace(r.trace || null);
       announce("Refreshed: the issuer issued a new access token.");
       pickUserToken(viewKind, r.tokens);
-    } catch (e) { setError(e.message); setTrace(e.data?.trace || null); announce(""); } finally { setBusy(false); }
+    } catch (e) {
+      if (e.status === 401 && /no sign-in session/.test(e.message)) { setSignedIn(false); setUserTokens(null); setTrace(null); }
+      setError(e.message); setTrace(e.data?.trace || null); announce("");
+    } finally { setBusy(false); }
   };
   const doSignOut = async () => {
     setBusy(true); setError("");

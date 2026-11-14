@@ -253,6 +253,8 @@ export function createRealSignin({ config, guard, now = Date.now }) {
     if (typeof tok.json.refresh_token === 'string') s.refresh = tok.json.refresh_token;
     const life = Number.isFinite(tok.json.expires_in) && tok.json.expires_in > 0 ? Math.min(tok.json.expires_in, 24 * 3600) : 3600;
     s.expiresAt = now() + life * 1000;
+    // The session keeps the latest trace so /signin/session can show it while signed in.
+    s.steps = t.entries;
     return { ok: true, tokens: tokensOf(s), trace: t.entries };
   }
 

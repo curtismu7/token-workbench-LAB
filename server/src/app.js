@@ -179,7 +179,7 @@ export function createApp({ runtime, health = createHealth(), webDist = DEFAULT_
     if (source !== 'real') return res.json({ signedIn: false });
     const s = signinClient.session(req.workspaceId);
     if (!s) return res.json({ signedIn: false });
-    return sendReal(res, { signedIn: true, username: signinClient.username(), provider: s.provider === 'pingfederate' ? 'pingfederate' : 'pingone', expiresAt: new Date(s.expiresAt).toISOString() });
+    return sendReal(res, { signedIn: true, username: signinClient.username(), provider: s.provider === 'pingfederate' ? 'pingfederate' : 'pingone', expiresAt: new Date(s.expiresAt).toISOString(), trace: s.steps || null });
   }));
 
   api.post('/decode', wrap(async (req, res) => {
@@ -273,7 +273,13 @@ export function createApp({ runtime, health = createHealth(), webDist = DEFAULT_
     if (err.code === 'run_queue_full') return res.set('Retry-After', '2').status(429).json({ error: 'run_queue_full', message: 'a run is in progress and another is already queued; try again shortly' });
     // A Real call that failed: the issuer's answer (or the netguard's refusal) and the trace so far, secret already scrubbed.
     if (err instanceof RealError) return sendReal(res, { error: 'real_error', source: 'real', message: err.message, trace: err.trace }, 502);
-    if (err instanceof SignInError) return sendReal(res, { error: 'signin_error', source: 'real', message: err.message, trace: err.trace }, err.message.includes('did not accept the username or password') ? 401 : 502);
+    if (err instanceof SignInError) {
+      // A missing/expired session is a 401 (the page offers Sign in again); a rejected password is 401 too; every
+      // other failure (the issuer refused or did not answer) is a 502 with its trace.
+      const msg = err.message || '';
+      const status = msg.includes('no sign-in session') || msg.includes('did not accept the username or password') ? 401 : 502;
+      return sendReal(res, { error: 'signin_error', source: 'real', message: err.message, trace: err.trace }, status);
+    }
     if (err instanceof TargetRefused) return res.status(400).json({ error: 'target_refused', reason: err.reason, message: err.message });
     if (err instanceof URIError || err.status === 400) return bad(res, 'malformed request');
     // Log the error class only: a message could echo part of a token.
