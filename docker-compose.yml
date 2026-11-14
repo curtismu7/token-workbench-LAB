@@ -10,7 +10,11 @@ services:
     build: .
     ports:
       - "127.0.0.1:${HOST_PORT:-5910}:5910"
+    # The local PingFederate serves a mkcert certificate: trust the mkcert root when TW_CA_FILE is set.
+    volumes:
+      - ${TW_CA_FILE:-/dev/null.invalid}:${TW_CA_FILE:-/dev/null.invalid}:ro
     environment:
+      NODE_EXTRA_CA_CERTS: ${TW_CA_FILE:-}
       SHELF_URL: ${SHELF_URL:-http://127.0.0.1:4400}
       TW_PORT: "5910"
       TW_BIND: 0.0.0.0
