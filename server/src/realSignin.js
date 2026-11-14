@@ -98,7 +98,10 @@ export function createRealSignin({ config, guard, now = Date.now }) {
   const scrub = (t) => config.scrub(t);
 
   const providerCfg = (provider) => {
-    if (provider === 'pingone') return config.pingone?.ok ? { ok: true, clientId: config.pingone.clientId, secret: config.pingone.secret, base: config.issuer, redirectUri: realSigninRedirectUri, discovery: false } : { ok: false, problems: config.pingone?.problems || ['PingOne sign-in is not configured'] };
+    // The PingOne issuer (TW_REAL_ISSUER) already ends in /as, so its paths are /authorize, /token and /resume on it.
+    // PingFederate's base has no /as: its paths are /as/authorization.oauth2 and /as/token.oauth2, from discovery.
+    const p1Base = String(config.issuer || '').replace(/\/as\/?$/, '') || config.issuer;
+    if (provider === 'pingone') return config.pingone?.ok ? { ok: true, clientId: config.pingone.clientId, secret: config.pingone.secret, base: p1Base, redirectUri: realSigninRedirectUri, discovery: false, authorizePath: '/as/authorize', tokenPath: '/as/token' } : { ok: false, problems: config.pingone?.problems || ['PingOne sign-in is not configured'] };
     return config.pingfederate?.ok ? { ok: true, clientId: config.pingfederate.clientId, secret: config.pingfederate.secret, base: config.pingfederate.base, redirectUri: config.pingfederate.redirectUri, discovery: true } : { ok: false, problems: config.pingfederate?.problems || ['PingFederate sign-in is not configured'] };
   };
 
@@ -150,8 +153,9 @@ export function createRealSignin({ config, guard, now = Date.now }) {
     let sent = false;
     const scrubTyped = (v) => (typeof password === 'string' && password.length >= 4 ? JSON.parse(JSON.stringify(v).split(JSON.stringify(password).slice(1, -1)).join('[the password]')) : v);
     try {
-      // 0. PingFederate: discovery once for the authorize and token endpoints (the origin is already netguard-checked).
-      let authorizePath = '/as/authorize'; let tokenPath = '/as/token';
+      // 0. Paths: the provider config carries them (PingOne: /as/* on the issuer minus its /as; PingFederate: from
+      //    discovery, since its authorize endpoint is /as/authorization.oauth2).
+      let authorizePath = pc.authorizePath || '/as/authorize'; let tokenPath = pc.tokenPath || '/as/token';
       if (pc.discovery) {
         const d = await idp(t, `discovery (${label})`, `${pc.base}/.well-known/openid-configuration`, { headers: { accept: 'application/json' } });
         if (d.status !== 200 || typeof d.json?.authorization_endpoint !== 'string' || typeof d.json?.token_endpoint !== 'string') throw new SignInError(`could not read ${label}'s discovery document (HTTP ${d.status})`, t.entries);
@@ -229,7 +233,7 @@ export function createRealSignin({ config, guard, now = Date.now }) {
     if (!pc.ok) throw new SignInError(`Sign in is not configured: ${pc.problems.join('; ')}`, []);
     const label = s.provider === 'pingfederate' ? 'PingFederate' : 'PingOne';
     const t = { entries: [] };
-    let tokenPath = '/as/token';
+    let tokenPath = pc.tokenPath || '/as/token';
     if (pc.discovery) {
       const d = await idp(t, `discovery (${label})`, `${pc.base}/.well-known/openid-configuration`, { headers: { accept: 'application/json' } });
       if (d.status !== 200 || typeof d.json?.token_endpoint !== 'string') throw new SignInError(`could not read ${label}'s discovery document (HTTP ${d.status})`, t.entries);

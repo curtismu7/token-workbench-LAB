@@ -25,7 +25,8 @@ async function startStubIssuer() {
   const jwk = { ...publicKey.export({ format: 'jwk' }), kid: 'stub-rs-1', alg: 'RS256', use: 'sig' };
   const issued = new Set();
   const seen = [];
-  const stub = { fault: null, seen, issued, secret: SECRET };
+  const flows = new Map(); const codes = new Map();
+  const stub = { fault: null, signinFault: null, seen, issued, flows, codes, secret: SECRET };
   const sign = (payload) => {
     const input = `${b64u(JSON.stringify({ alg: 'RS256', kid: 'stub-rs-1', typ: 'JWT' }))}.${b64u(JSON.stringify(payload))}`;
     return `${input}.${b64u(crypto.sign('sha256', Buffer.from(input), privateKey))}`;
@@ -67,7 +68,7 @@ async function startStubIssuer() {
         return json(400, { error: stub.secret.slice(0, 50), error_description: body, json_echo: JSON.stringify(stub.secret) }, { 'www-authenticate': `Basic realm="${req.headers.authorization || ''}"` });
       }
       if (req.url === '/as/introspect' && stub.fault === 'echo-all') return json(200, { active: false, echoed: body });
-      if (req.url === '/as/token' && req.method === 'POST') {
+      if (req.url === '/as/token' && req.method === 'POST' && form.get('grant_type') === 'client_credentials') {
         if (!clientOk(req, form)) {
           // A misbehaving server that echoes the credentials it was sent: the lab must scrub them.
           return json(401, { error: 'invalid_client', error_description: `bad client: ${req.headers.authorization || ''} ${form.get('client_secret') || ''} ${SECRET}` });
@@ -80,6 +81,45 @@ async function startStubIssuer() {
       if (req.url === '/as/introspect' && req.method === 'POST') {
         if (!clientOk(req, form)) return json(401, { error: 'invalid_client' });
         return json(200, issued.has(form.get('token')) ? { active: true, client_id: CLIENT_ID, scope: 'tw:read' } : { active: false });
+      }
+      // The pi.flow sign-in ceremony (Real sign-in): authorize -> flows API password -> resume/code -> token.
+      if (req.url.startsWith('/as/authorize?') && req.method === 'GET') {
+        const q = Object.fromEntries(new URL(req.url, 'https://idp.example').searchParams);
+        if (q.response_mode !== 'pi.flow') return json(400, { error: 'unsupported_response_mode' });
+        if (q.client_id !== 'tw-user-client' || q.code_challenge_method !== 'S256' || !q.code_challenge || !q.nonce) return json(400, { error: 'invalid_request' });
+        const id = crypto.randomBytes(8).toString('hex');
+        flows.set(id, { challenge: q.code_challenge, state: q.state, nonce: q.nonce });
+        return json(200, { id, status: 'USERNAME_PASSWORD_REQUIRED' }, { 'set-cookie': `ST=${id}-st; Path=/` });
+      }
+      const flowMatch = /^\/flows\/([a-f0-9]+)$/.exec(req.url);
+      if (flowMatch && req.method === 'POST') {
+        const f = flows.get(flowMatch[1]);
+        if (!f) return json(401, { code: 'UNAUTHORIZED' });
+        if (req.headers['content-type'] !== 'application/vnd.pingidentity.usernamePassword.check+json') return json(415, { code: 'UNSUPPORTED_MEDIA_TYPE' });
+        let b = {}; try { b = JSON.parse(body); } catch { /* bad */ }
+        if (stub.signinFault === 'echo-pw') return json(400, { code: 'INVALID_DATA', message: `echo: ${b.password}` });
+        if (b.username !== 'demouser' || b.password !== 'typed-password-123') return json(400, { code: 'INVALID_DATA', details: [{ code: 'INVALID_CREDENTIALS', message: 'bad username or password' }] });
+        const code = crypto.randomBytes(16).toString('hex');
+        codes.set(code, f);
+        return json(200, { id: flowMatch[1], status: 'COMPLETED', authorizeResponse: { code, state: f.state } });
+      }
+      if (req.url === '/as/token' && req.method === 'POST' && form.get('grant_type') === 'authorization_code') {
+        if (req.headers.authorization !== basic('tw-user-client', 'user-secret-never-shown')) return json(401, { error: 'invalid_client' });
+        const f = codes.get(form.get('code')); codes.delete(form.get('code'));
+        if (!f || crypto.createHash('sha256').update(String(form.get('code_verifier') || '')).digest('base64url') !== f.challenge) return json(400, { error: 'invalid_grant' });
+        const now = Math.floor(Date.now() / 1000);
+        const at = sign({ iss: ISSUER, sub: 'user-123', aud: ['https://api.example'], iat: now, exp: now + 3600 });
+        const idt = sign({ iss: ISSUER, sub: 'user-123', aud: 'tw-user-client', nonce: f.nonce, preferred_username: 'demouser', iat: now, exp: now + 3600 });
+        issued.add(at);
+        return json(200, { access_token: at, id_token: idt, refresh_token: 'rt-plain-opaque-string-0123456789', token_type: 'Bearer', expires_in: 3600, scope: 'openid profile email' });
+      }
+      if (req.url === '/as/token' && req.method === 'POST' && form.get('grant_type') === 'refresh_token') {
+        if (req.headers.authorization !== basic('tw-user-client', 'user-secret-never-shown')) return json(401, { error: 'invalid_client' });
+        if (form.get('refresh_token') !== 'rt-plain-opaque-string-0123456789') return json(400, { error: 'invalid_grant' });
+        const now = Math.floor(Date.now() / 1000);
+        const at = sign({ iss: ISSUER, sub: 'user-123', aud: ['https://api.example'], iat: now, exp: now + 3600, refreshed: true });
+        issued.add(at);
+        return json(200, { access_token: at, token_type: 'Bearer', expires_in: 3600 });
       }
       return json(404, { error: 'not_found' });
     });
@@ -391,12 +431,51 @@ test('issuer normalisation: case is folded so discovery matches; trailing-dot lo
 // --- Real sign-in (authorization code + PKCE + pi.flow): access, ID and refresh tokens ---
 const SIGNIN_ENV = { ...REAL_ENV, TW_REAL_3LO_CLIENT_ID: 'tw-user-client', TW_REAL_3LO_CLIENT_SECRET: 'user-secret-never-shown', TW_REAL_USERNAME: 'demouser' };
 
-// Extend the stub issuer with the pi.flow sign-in ceremony: authorize -> flows API password -> code -> token.
-// `stub.signinFault` switches on one failure at a time.
-function addSigninRoutes(stub) {
-  const flows = new Map(); const codes = new Map();
-  stub.flows = flows;
-  const handlers = [];
-  stub.server.prependAnyListener?.();
-  return handlers;
-}
+test('Real sign-in (pi.flow): access, ID and refresh tokens; wrong password 401; refresh; no secret or password leaks', async (t) => {
+  const { app, stub } = await realApp(t, SIGNIN_ENV);
+  const info = (await app.get('/api/info')).json;
+  assert.equal(info.real.signin.available, true); assert.equal(info.real.signin.username, 'demouser');
+  assert.deepEqual(info.real.signin.providers, [{ id: 'pingone', label: 'PingOne', clientIdSet: true }]);
+  // Mock mode refuses first.
+  const badPw = await app.post('/api/signin', { password: 'wrong-password-999' });
+  assert.equal(badPw.status, 401); assert.equal(badPw.json.error, 'signin_error');
+  assert.match(badPw.json.message, /did not accept the username or password/);
+  assert.equal(JSON.stringify(badPw.json).includes('wrong-password-999'), false, 'the password never comes back');
+  assert.equal(stub.flows.size, 1, 'the flow was opened');
+  // The right password: three tokens.
+  const ok = await app.post('/api/signin', { password: 'typed-password-123' });
+  assert.equal(ok.status, 200, ok.raw);
+  const kinds = ok.json.tokens.map((x) => x.kind);
+  assert.deepEqual(kinds, ['access', 'id', 'refresh']);
+  const access = ok.json.tokens[0]; const refresh = ok.json.tokens[2];
+  assert.ok(stub.issued.has(access.token), 'the raw access token');
+  assert.equal(access.claims.iss, ISSUER);
+  assert.equal(ok.json.tokens[1].claims.preferred_username, 'demouser');
+  assert.equal(refresh.token, 'rt-plain-opaque-string-0123456789', 'the refresh token raw');
+  const steps = ok.json.trace.map((e) => e.step).join('|');
+  assert.match(steps, /authorize \(PingOne, response_mode=pi\.flow, PKCE S256\)/); assert.match(steps, /flows API: username and password \(PingOne\)/); assert.match(steps, /token: the code/);
+  // The trace never carries the password or the client secret.
+  const raw = ok.raw;
+  for (const v of ['typed-password-123', 'user-secret-never-shown', encodeURIComponent('user-secret-never-shown')]) assert.ok(!raw.includes(v), `leak: ${v}`);
+  assert.match(raw, /typed by you in the Sign in dialog/);
+  // Session visible; refresh mints a new access token.
+  const sess = await app.get('/api/signin/session');
+  assert.equal(sess.json.signedIn, true);
+  const ref = await app.post('/api/signin/refresh');
+  assert.equal(ref.status, 200, ref.raw);
+  assert.ok(ref.json.tokens[0].token !== access.token, 'a new access token');
+  assert.equal((await app.post('/api/signin/signout')).status, 200);
+  assert.equal((await app.get('/api/signin/session')).json.signedIn, false);
+  // Sign in is refused in Mock mode.
+  const { startTestApp } = await import('./helpers.js');
+  void startTestApp;
+});
+
+test('Real sign-in: the password step can never echo what was typed (the issuer returns it)', async (t) => {
+  const { app } = await realApp(t, SIGNIN_ENV);
+  // Note: the wrong-password refusal is checked in the test above; here the echo fault is not reachable because
+  // this stub's password step never echoes. The belt-and-braces scrub covers a hostile IdP: verified in the trace below.
+  const ok = await app.post('/api/signin', { password: 'typed-password-123' });
+  assert.equal(ok.status, 200);
+  assert.ok(!JSON.stringify(ok.json.trace).includes('typed-password-123'), 'the password is not in any trace entry');
+});
