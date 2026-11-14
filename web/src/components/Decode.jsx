@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { postDecode, postIntrospect, postMint } from "../lib/api.js";
+import { postDecode, postIntrospect, postMint, postSignIn, postSigninRefresh, postSigninSignout, getSigninSession } from "../lib/api.js";
 import { expiryText, show } from "../lib/format.js";
 import Badge from "./Badge.jsx";
 import Trace from "./Trace.jsx";
@@ -26,6 +26,18 @@ export default function Decode({ announce, source = "mock" }) {
   const [tick, setTick] = useState(0);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  // Real sign-in: the three tokens from the pi.flow sign-in, the kind being viewed, and the dialog's fields.
+  const [userTokens, setUserTokens] = useState(null); // [{kind, label, token, header, claims}] or null
+  const [viewKind, setViewKind] = useState("access");
+  const [pw, setPw] = useState("");
+  const [showPw, setShowPw] = useState(false);
+  const [signedIn, setSignedIn] = useState(false);
+
+  useEffect(() => {
+    if (!real) return undefined;
+    getSigninSession().then((s) => setSignedIn(!!s?.signedIn), () => {});
+    return undefined;
+  }, [real]);
 
   useEffect(() => {
     if (!res?.time?.hasExp) return undefined;
@@ -52,6 +64,41 @@ export default function Decode({ announce, source = "mock" }) {
     catch (e) { setIntro(null); setError(e.message); setTrace(e.data?.trace || null); announce(""); } finally { setBusy(false); }
   };
 
+  // --- Real sign-in (pi.flow): password typed once, sent once, never stored ---
+  const pickUserToken = (kind, list = userTokens) => {
+    const t = (list || []).find((x) => x.kind === kind);
+    if (!t?.token) { setToken(""); setRes(null); setLabel(null); setTrace(null); return; }
+    setToken(t.token); setLabel("REAL"); setViewKind(kind);
+    setRes({ header: t.header, payload: t.claims, claims: [], signature: { state: "not_verified", note: kind === "refresh" ? "A refresh token is data, not a JWT: there is no signature to check. Introspection does not apply to it either." : "Decode is offline. Tick the box to verify the signature against the issuer's real JWKS." }, time: { hasExp: false } });
+    setTrace(null); setIntro(null); setDecodedAt(Date.now());
+    if (kind !== "refresh") run(t.token, verify);
+  };
+  const doSignIn = async () => {
+    setBusy(true); setError(""); setIntro(null);
+    try {
+      const r = await postSignIn(pw);
+      setPw(""); setShowPw(false); setSignedIn(true); setUserTokens(r.tokens); setTrace(r.trace || null);
+      announce("Signed in. Access, ID and refresh tokens are ready.");
+      pickUserToken(viewKind, r.tokens);
+    } catch (e) { setError(e.message); setTrace(e.data?.trace || null); announce(""); } finally { setBusy(false); }
+  };
+  const doRefresh = async () => {
+    setBusy(true); setError("");
+    try {
+      const r = await postSigninRefresh();
+      setUserTokens(r.tokens); setTrace(r.trace || null);
+      announce("Refreshed: the issuer issued a new access token.");
+      pickUserToken(viewKind, r.tokens);
+    } catch (e) { setError(e.message); setTrace(e.data?.trace || null); announce(""); } finally { setBusy(false); }
+  };
+  const doSignOut = async () => {
+    setBusy(true); setError("");
+    try { await postSigninSignout(); } catch { /* the session is gone either way */ }
+    setSignedIn(false); setUserTokens(null); setToken(""); setRes(null); setLabel(null); setTrace(null); setIntro(null);
+    announce("Signed out: the sign-in session is dropped.");
+    setBusy(false);
+  };
+
   const elapsed = res ? Math.floor((Date.now() - decodedAt) / 1000) : 0; void tick;
   const left = res?.time?.secondsToExpiry == null ? null : res.time.secondsToExpiry - elapsed;
   const cnf = res?.claims.filter((c) => c.name === "cnf" || c.name.startsWith("cnf."));
@@ -74,10 +121,37 @@ export default function Decode({ announce, source = "mock" }) {
           <button type="button" className="btn" onClick={introspect} disabled={busy || !token.trim()}>{real ? "Introspect at the issuer" : "Introspect (stub issuer)"}</button>
         </div>
         {real ? (
-          <div className="row" role="group" aria-label="Get a real token">
-            <span className="muted small">Get a token:</span>
-            <button type="button" className="btn" onClick={() => mint("client_credentials")} disabled={busy}>REAL client_credentials token</button>
-          </div>
+          <>
+            <div className="row" role="group" aria-label="Get a real token">
+              <span className="muted small">Get a token:</span>
+              <button type="button" className="btn" onClick={() => mint("client_credentials")} disabled={busy}>REAL client_credentials token</button>
+            </div>
+            <div className="row" role="group" aria-label="Sign in">
+              <span className="muted small">User sign-in:</span>
+              {signedIn ? (
+                <>
+                  <button type="button" className="btn" onClick={doRefresh} disabled={busy}>Refresh tokens</button>
+                  <button type="button" className="btn" onClick={doSignOut} disabled={busy}>Sign out</button>
+                </>
+              ) : (
+                <>
+                  <input type={showPw ? "text" : "password"} className="pw mono" value={pw} autoComplete="off" spellCheck={false} placeholder="password for the sign-in" aria-label="Password for the sign-in" onChange={(e) => setPw(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && pw && !busy) doSignIn(); }} />
+                  <button type="button" className="btn" onClick={() => setShowPw((v) => !v)} aria-pressed={showPw}>{showPw ? "Hide" : "Show"}</button>
+                  <button type="button" className="btn primary" onClick={doSignIn} disabled={busy || !pw}>Sign in</button>
+                </>
+              )}
+            </div>
+            {userTokens && (
+              <div className="row" role="group" aria-label="Which token to view">
+                <span className="muted small">View:</span>
+                {userTokens.map((t) => (
+                  <button key={t.kind} type="button" className={`btn ${viewKind === t.kind ? "primary" : ""}`} data-testid={`token-kind-${t.kind}`} onClick={() => pickUserToken(t.kind)} disabled={!t.token} title={t.token ? t.label : "the issuer issued none"}>
+                    {t.label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </>
         ) : (
           <div className="row" role="group" aria-label="Mint a sample token">
             <span className="muted small">Mint a sample:</span>

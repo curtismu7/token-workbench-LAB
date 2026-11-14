@@ -23,6 +23,10 @@ services:
       TW_REAL_CLIENT_SECRET: ${TW_REAL_CLIENT_SECRET:-}
       TW_REAL_SCOPE: ${TW_REAL_SCOPE:-}
       TW_REAL_TOKEN_AUTH: ${TW_REAL_TOKEN_AUTH:-}
+      # Real sign-in (authorization code + PKCE + pi.flow): the user client and the username.
+      TW_REAL_3LO_CLIENT_ID: ${TW_REAL_3LO_CLIENT_ID:-}
+      TW_REAL_3LO_CLIENT_SECRET: ${TW_REAL_3LO_CLIENT_SECRET:-}
+      TW_REAL_USERNAME: ${TW_REAL_USERNAME:-}
     read_only: true
     cap_drop: [ALL]
     security_opt: ["no-new-privileges:true"]
