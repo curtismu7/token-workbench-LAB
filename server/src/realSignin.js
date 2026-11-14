@@ -95,7 +95,8 @@ export class SignInError extends Error {
 export function createRealSignin({ config, guard, now = Date.now }) {
   const sessions = new Map(); // workspace -> { access, idToken, refresh, header, claims, idClaims, expiresAt, steps, provider }
   let inFlight = 0;
-  const scrub = (t) => config.scrub(t);
+  // config.scrub is string-only; entries are objects, so scrub their JSON form and keep the structure.
+  const scrubEntries = (entries) => JSON.parse(config.scrub(JSON.stringify(entries)));
 
   const providerCfg = (provider) => {
     // The PingOne issuer (TW_REAL_ISSUER) already ends in /as, so its paths are /authorize, /token and /resume on it.
@@ -116,7 +117,7 @@ export function createRealSignin({ config, guard, now = Date.now }) {
 
   async function idp(t, step, url, { method = 'GET', headers = {}, shownHeaders = headers, body, shownBody } = {}) {
     const tp = `00-${randomBytes(16).toString('hex')}-${randomBytes(8).toString('hex')}-01`;
-    const entry = { step, method, url: scrub(url), request: { headers: { ...shownHeaders, traceparent: tp }, ...(shownBody !== undefined ? { body: shownBody } : {}) } };
+    const entry = { step, method, url: config.scrub(url), request: { headers: { ...shownHeaders, traceparent: tp }, ...(shownBody !== undefined ? { body: shownBody } : {}) } };
     t.entries.push(entry);
     let r;
     try { r = await guard.request(url, { method, headers: { ...headers, traceparent: tp }, body }); } catch (e) {
@@ -256,7 +257,7 @@ export function createRealSignin({ config, guard, now = Date.now }) {
     // The session accumulates the trace (sign-in steps + every refresh) so /signin/session can show the whole
     // exchange history while signed in. Each entry is scrubbed once, when it is appended (no password is ever in
     // a refresh trace, so scrub alone covers it).
-    s.steps = [...(s.steps || []), ...scrub(t.entries)];
+    s.steps = [...(s.steps || []), ...scrubEntries(t.entries)];
     return { ok: true, tokens: tokensOf(s), trace: s.steps };
   }
 
