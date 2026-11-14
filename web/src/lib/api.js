@@ -1,5 +1,6 @@
-// Thin fetch wrapper. JSON in, JSON out. No credential headers, no cookies: the server refuses them. The token under
-// test is DATA in a JSON body, never an Authorization header.
+// Thin fetch wrapper. JSON in, JSON out. No credential headers, no auth: the server refuses them. The token under
+// test is DATA in a JSON body, never an Authorization header. credentials stays at the default same-origin: behind the
+// lab-proxy the routing cookie (lab=token-workbench) must ride along, and the server itself never reads cookies.
 // One workspace per browser tab (sessionStorage), so a hosted visitor's keys, runs and results are private to the tab.
 // The id is a label, not a credential. The local build ignores the header.
 let memoryId = null;
@@ -17,7 +18,7 @@ function newId() {
 }
 
 async function call(path, method = "GET", body) {
-  const init = { method, credentials: "omit", headers: { Accept: "application/json", "X-Workspace-Id": workspaceId() } };
+  const init = { method, headers: { Accept: "application/json", "X-Workspace-Id": workspaceId() } };
   if (body !== undefined) { init.headers["Content-Type"] = "application/json"; init.body = JSON.stringify(body); }
   let res;
   try { res = await fetch(path, init); } catch { throw new Error("cannot reach the Token Workbench server"); }

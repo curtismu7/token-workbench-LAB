@@ -1,6 +1,6 @@
 /* App layout and component rules only. Colours and fonts come from the shared tokens in standalone-ui.css, which loads first.
    Dark and light live there; App sets data-theme on <html>. Outcomes are green, amber, red and blue, always with a word beside the colour. */
-.page { max-width: 80rem; margin: 0 auto; padding: 1rem; }
+.page { max-width: 1100px; margin: 0 auto; padding: 1rem; }
 h1 { margin: 0; font-size: 1.35rem; letter-spacing: 0.01em; }
 h2 { margin: 0 0 0.5rem; font-size: 1.3rem; }
 h3 { margin: 0.5rem 0 0.35rem; font-size: 1.05rem; }
@@ -13,11 +13,22 @@ code, .mono { font-size: 0.85rem; overflow-wrap: anywhere; }
 
 .banner.hosted { border-left-color: var(--status-info); font-weight: 700; }
 .banner.warn { border-left-color: var(--status-warn); }
-.top { position: relative; display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 1.25rem; padding: 0.6rem 0; border-bottom: 1px solid var(--border); }
-.top nav { display: flex; flex-wrap: wrap; gap: 0.25rem; flex: 1 1 12rem; }
-.mode { padding: 0.15rem 0.6rem; border-radius: 4px; font: 700 0.8rem var(--font-mono); letter-spacing: 0.08em; border: 2px solid; }
-.mode--demo { color: var(--status-info); background: var(--surface-2); border-color: var(--status-info); }
-.mode--real { color: var(--status-warn); background: var(--surface-2); border-color: var(--status-warn); }
+/* Shell bar (STANDALONE-UI-PATTERNS.md section 1): Core Dark in both themes, Ping Red gradient rule, full-bleed. */
+.shell-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 1.25rem; padding: 0.6rem 1.25rem; margin: 0 -16px; position: relative;
+  background: var(--box-dark); color: var(--on-box); border-bottom: 3px solid transparent; border-image: var(--accent-gradient) 1; }
+.shell-bar :focus-visible { outline: 3px solid var(--on-box); outline-offset: 2px; }
+.shell-bar h1 { color: var(--on-box); font-size: 1.2rem; }
+.shell-brand { display: inline-flex; align-items: center; gap: 0.6rem; font-weight: 700; letter-spacing: 0.02em; }
+.shell-logo { display: inline-grid; place-items: center; width: 1.9rem; height: 1.9rem; border-radius: 4px; background: var(--accent-gradient); color: #fff; font-weight: 800; font-size: 0.8rem; }
+.shell-right { display: inline-flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; font-size: 0.85rem; }
+.tabbar { display: flex; flex-wrap: wrap; overflow-x: auto; padding: 0.25rem 0; gap: 0.25rem; flex: 1 1 12rem; }
+.tabbar .tab { white-space: nowrap; background: transparent; color: var(--on-box); border-color: transparent; }
+.tabbar .tab:hover { border-color: var(--on-box); }
+.tabbar .tab[aria-pressed="true"], .tabbar .tab[aria-current="page"] { background: var(--accent-gradient); color: var(--on-accent); border-color: transparent; font-weight: 600; }
+.mode { padding: 0.15rem 0.6rem; border-radius: 999px; font: 700 0.68rem var(--font-mono); letter-spacing: 0.08em; border: 1px solid transparent; }
+.mode--demo { background: var(--accent-gradient); color: var(--on-accent); }
+.mode--real { background: var(--surface-2); color: var(--status-warn); border-color: var(--status-warn); }
+@media (max-width: 600px) { .shell-bar { gap: 0.75rem; padding: 0.6rem 1rem; } .tabbar { order: 3; flex-basis: 100%; } }
 
 .btn, .small-btn { white-space: nowrap; }
 .small-btn { min-height: 2rem; padding: 0.2rem 0.7rem; }

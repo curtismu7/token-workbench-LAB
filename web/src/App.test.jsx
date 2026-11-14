@@ -45,14 +45,16 @@ describe("shell", () => {
     expect(await screen.findByText(/Cannot reach the Token Workbench API/)).toBeInTheDocument();
   });
 
-  it("sends JSON bodies and never a credential header or cookie", async () => {
+  it("sends JSON bodies and never a credential header", async () => {
     const calls = stubFetch({ ...base, "POST /api/decode": decoded() });
     render(<App />);
     await userEvent.type(screen.getByLabelText("Token (JWT)"), fakeToken());
     await userEvent.click(screen.getByRole("button", { name: "Decode" }));
     await screen.findByTestId("decode-result");
     const post = calls.find((c) => c.method === "POST" && c.path === "/api/decode");
-    expect(post.init.credentials).toBe("omit");
+    // credentials stays at the fetch default (same-origin): behind the lab-proxy the routing cookie must ride along;
+    // the server itself never reads cookies, so no credential is sent anywhere that matters.
+    expect(post.init.credentials).toBeUndefined();
     expect(Object.keys(post.init.headers).map((h) => h.toLowerCase()).sort()).toEqual(["accept", "content-type", "x-workspace-id"]); // the workspace label is the only addition; it is not a credential
     expect(JSON.parse(post.init.body)).toEqual({ token: fakeToken(), verify: false });
     for (const c of calls) expect(Object.keys(c.init.headers || {}).some((h) => /authorization|cookie|dpop/i.test(h))).toBe(false);
