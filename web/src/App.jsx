@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import ShelfLink from "./components/ShelfLink.jsx";
+import VerifyMark from "./components/VerifyMark.jsx";
 import { getHealth, getInfo, getMeta, postReset, setMode } from "./lib/api.js";
 import Decode from "./components/Decode.jsx";
 import Tester from "./components/Tester.jsx";
@@ -88,6 +89,7 @@ export default function App() {
           talkTrack={{ active: tab === "talk", onToggle: () => { setTab("talk"); setMessage(""); } }}
         >
           <ShelfLink headers={() => ({ "X-Workspace-Id": workspaceId() })} />
+          <VerifyMark id="token-workbench" headers={() => ({ "X-Workspace-Id": workspaceId() })} />
           <ReturnLink app="token-workbench" variant="header" />
         </TopMenu>
         </span>
