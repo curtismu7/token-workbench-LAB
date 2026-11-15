@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { postDecode, postIntrospect, postMint } from "../lib/api.js";
+import { postDecode, postIntrospect, postMint, postSignIn, postSigninRefresh, postSigninSignout, getSigninSession } from "../lib/api.js";
 import { expiryText, show } from "../lib/format.js";
 import Badge from "./Badge.jsx";
 import Json from "./JsonPane.jsx";
@@ -17,7 +17,8 @@ const CLAIM_HOT = ["alg", "exp", "nbf", "jkt", "x5t#S256"];
 const LEVEL = { info: null, warn: ["hold", "Warning"], danger: ["deny", "Danger"] };
 
 // source: "mock" or "real" (the server's mode). The component is remounted on a switch, so state never crosses modes.
-export default function Decode({ announce, source = "mock" }) {
+// signinProviders: the configured sign-in IdPs from /api/info (PingOne, PingFederate or both).
+export default function Decode({ announce, source = "mock", signinProviders = [] }) {
   const real = source === "real";
   const [token, setToken] = useState("");
   const [label, setLabel] = useState(null); // MOCK or REAL for a minted token; null for a pasted one
@@ -30,6 +31,21 @@ export default function Decode({ announce, source = "mock" }) {
   const [tick, setTick] = useState(0);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  // Real sign-in: the three tokens from the pi.flow sign-in, the kind being viewed, and the dialog's fields.
+  const [userTokens, setUserTokens] = useState(null); // [{kind, label, token, header, claims}] or null
+  const [viewKind, setViewKind] = useState("access");
+  const [pw, setPw] = useState("");
+  const [showPw, setShowPw] = useState(false);
+  const [signedIn, setSignedIn] = useState(false);
+  const [provider, setProvider] = useState("pingone"); // which IdP the sign-in goes to
+  const providerList = signinProviders.length ? signinProviders : [];
+
+  useEffect(() => {
+    if (!real) return undefined;
+    // While signed in the session's trace (the sign-in / refresh exchanges) stays visible across reloads.
+    getSigninSession().then((s) => { setSignedIn(!!s?.signedIn); if (s?.provider) setProvider(s.provider); if (s?.signedIn && s.trace) setTrace(s.trace); }, () => {});
+    return undefined;
+  }, [real]);
 
   useEffect(() => {
     if (!res?.time?.hasExp) return undefined;
@@ -41,7 +57,7 @@ export default function Decode({ announce, source = "mock" }) {
     setBusy(true); setError(""); setIntro(null);
     try {
       const d = await postDecode(tok, v);
-      setRes(d); setDecodedToken(tok.trim()); setDecodedAt(Date.now()); setTick(0); setTrace(d.trace || null);
+      setRes(d); setDecodedToken(tok.trim()); setDecodedAt(Date.now()); setTick(0); setTrace(d.trace || trace);
       announce(`Decoded: ${d.claims.length} claims. ${SIG[d.signature.state][1]}.`);
     } catch (e) { setRes(null); setError(e.message); setTrace(e.data?.trace || null); announce(""); } finally { setBusy(false); }
   };
@@ -52,8 +68,46 @@ export default function Decode({ announce, source = "mock" }) {
   };
   const introspect = async () => {
     setBusy(true); setError("");
-    try { const d = await postIntrospect(token.trim()); setIntro(d); setTrace(d.trace || null); announce(`Introspection: ${d.active ? "active" : "not active"}.`); }
+    try { const d = await postIntrospect(token.trim()); setIntro(d); setTrace(d.trace || trace); announce(`Introspection: ${d.active ? "active" : "not active"}.`); }
     catch (e) { setIntro(null); setError(e.message); setTrace(e.data?.trace || null); announce(""); } finally { setBusy(false); }
+  };
+
+  // --- Real sign-in (pi.flow): password typed once, sent once, never stored ---
+  const pickUserToken = (kind, list = userTokens) => {
+    const t = (list || []).find((x) => x.kind === kind);
+    if (!t?.token) { setToken(""); setRes(null); setLabel(null); setTrace(null); return; }
+    setToken(t.token); setLabel("REAL"); setViewKind(kind);
+    setRes({ header: t.header, payload: t.claims, claims: [], signature: { state: "not_verified", note: kind === "refresh" ? "A refresh token is data, not a JWT: there is no signature to check. Introspection does not apply to it either." : "Decode is offline. Tick the box to verify the signature against the issuer's real JWKS." }, time: { hasExp: false } });
+    setTrace(null); setIntro(null); setDecodedAt(Date.now());
+    if (kind !== "refresh") run(t.token, verify);
+  };
+  const doSignIn = async () => {
+    setBusy(true); setError(""); setIntro(null);
+    try {
+      const r = await postSignIn(pw, provider);
+      setPw(""); setShowPw(false); setSignedIn(true); setUserTokens(r.tokens); setTrace(r.trace || null);
+      announce(`Signed in to ${provider === "pingfederate" ? "PingFederate" : "PingOne"}. Access, ID and refresh tokens are ready.`);
+      pickUserToken(viewKind, r.tokens);
+    } catch (e) { setError(e.message); setTrace(e.data?.trace || null); announce(""); } finally { setBusy(false); }
+  };
+  const doRefresh = async () => {
+    setBusy(true); setError("");
+    try {
+      const r = await postSigninRefresh();
+      setUserTokens(r.tokens); setTrace(r.trace || null);
+      announce("Refreshed: the issuer issued a new access token.");
+      pickUserToken(viewKind, r.tokens);
+    } catch (e) {
+      if (e.status === 401 && /no sign-in session/.test(e.message)) { setSignedIn(false); setUserTokens(null); setTrace(null); }
+      setError(e.message); setTrace(e.data?.trace || null); announce("");
+    } finally { setBusy(false); }
+  };
+  const doSignOut = async () => {
+    setBusy(true); setError("");
+    try { await postSigninSignout(); } catch { /* the session is gone either way */ }
+    setSignedIn(false); setUserTokens(null); setToken(""); setRes(null); setLabel(null); setTrace(null); setIntro(null);
+    announce("Signed out: the sign-in session is dropped.");
+    setBusy(false);
   };
 
   const elapsed = res ? Math.floor((Date.now() - decodedAt) / 1000) : 0; void tick;
@@ -71,17 +125,51 @@ export default function Decode({ announce, source = "mock" }) {
           <label htmlFor="tok" className="lbl">Token (JWT)</label>
           {label && <Badge kind={label === "REAL" ? "hold" : "info"} title={label === "REAL" ? "Issued by the configured real issuer" : "Signed by the stub issuer in this process"}><span data-testid="token-label">{label}</span></Badge>}
         </div>
-        <textarea id="tok" className="tok mono" rows={4} value={token} spellCheck={false} autoComplete="off" onChange={(e) => { setToken(e.target.value); setLabel(null); }} placeholder="eyJ..." />
+        <textarea id="tok" className="tok mono" rows={Math.max(4, token.split("\n").length + Math.ceil(token.length / 120))} value={token} spellCheck={false} autoComplete="off" onChange={(e) => { setToken(e.target.value); setLabel(null); }} placeholder="eyJ..." />
         <div className="row">
           <button type="button" className="btn primary" onClick={() => run()} disabled={busy || !token.trim()}>Decode</button>
           <label className="check"><input type="checkbox" checked={verify} onChange={(e) => setVerify(e.target.checked)} /> {real ? "Verify the signature against the issuer's real JWKS" : "Verify the signature against the stub JWKS"}</label>
           <button type="button" className="btn" onClick={introspect} disabled={busy || !token.trim()}>{real ? "Introspect at the issuer" : "Introspect (stub issuer)"}</button>
         </div>
         {real ? (
-          <div className="row" role="group" aria-label="Get a real token">
-            <span className="muted small">Get a token:</span>
-            <button type="button" className="btn" onClick={() => mint("client_credentials")} disabled={busy}>REAL client_credentials token</button>
-          </div>
+          <>
+            <div className="row" role="group" aria-label="Get a real token">
+              <span className="muted small">Get a token:</span>
+              <button type="button" className="btn" onClick={() => mint("client_credentials")} disabled={busy}>REAL client_credentials token</button>
+            </div>
+            <div className="row" role="group" aria-label="Sign in">
+              <span className="muted small">User sign-in:</span>
+              <span className="muted small" title="Which server the sign-in goes to. Only the ones configured in the lab's .env are offered.">Sign in to:</span>
+              <select aria-label="Sign-in provider" value={provider} onChange={(e) => setProvider(e.target.value)} disabled={busy || signedIn || providerList.length < 2}>
+                {(providerList.length ? providerList : [{ id: "pingone", label: "PingOne" }]).map((p) => <option key={p.id} value={p.id}>{p.label}</option>)}
+              </select>
+              {signedIn ? (
+                <>
+                  <button type="button" className="btn" onClick={doRefresh} disabled={busy} title="Exchanges the refresh token for a new access (and ID) token at the same server">Refresh tokens</button>
+                  <button type="button" className="btn" onClick={doSignOut} disabled={busy} title="Drops this lab's copy of the sign-in session. The issuer's tokens stay valid until they expire.">Sign out</button>
+                </>
+              ) : (
+                <>
+                  <input type={showPw ? "text" : "password"} className="pw mono" value={pw} autoComplete="off" spellCheck={false} placeholder="password for the sign-in" aria-label="Password for the sign-in" onChange={(e) => setPw(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && pw && !busy) doSignIn(); }} />
+                  <button type="button" className="btn" onClick={() => setShowPw((v) => !v)} aria-pressed={showPw} title="Show or hide what you typed">{showPw ? "Hide" : "Show"}</button>
+                  <button type="button" className="btn primary" onClick={doSignIn} disabled={busy || !pw} title={`Runs an authorization-code + PKCE sign-in with response_mode=pi.flow at ${provider === "pingfederate" ? "the configured PingFederate" : "the configured PingOne environment"}: the login stays in this page, no redirect. The password is sent once to the server you picked and never stored, logged or shown.`}>Sign in</button>
+                </>
+              )}
+            </div>
+            {!signedIn && pw && (
+              <p className="muted small">Sign in runs authorization code + PKCE with <code>response_mode=pi.flow</code> at {provider === "pingfederate" ? "PingFederate" : "PingOne"}: the login form stays in this page (no browser redirect). The password is sent once, over the trace below, never stored or shown. On success the issuer returns three tokens — access, ID and refresh — each shown raw under “View”.</p>
+            )}
+            {userTokens && (
+              <div className="row" role="group" aria-label="Which token to view">
+                <span className="muted small">View:</span>
+                {userTokens.map((t) => (
+                  <button key={t.kind} type="button" className={`btn ${viewKind === t.kind ? "primary" : ""}`} data-testid={`token-kind-${t.kind}`} onClick={() => pickUserToken(t.kind)} disabled={!t.token} title={t.token ? t.label : "the issuer issued none"}>
+                    {t.label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </>
         ) : (
           <div className="row" role="group" aria-label="Mint a sample token">
             <span className="muted small">Mint a sample:</span>

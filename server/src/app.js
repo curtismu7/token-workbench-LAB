@@ -24,6 +24,7 @@ import { ALLOWED_ALGS } from './validator.js';
 import { shelfInfo } from './shelfLink.js';
 import { createNetguard } from './netguard.js';
 import { RealError, createRealClient, realConfigFrom, realPublicView } from './real.js';
+import { SignInError, createRealSignin, realSigninFrom, REAL_SIGNIN_SETTINGS, realSigninRedirectUri } from './realSignin.js';
 
 const wrap = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
 const bad = (res, message, status = 400, error) => res.status(status).json({ error: error || (status === 404 ? 'not_found' : 'bad_request'), message });
@@ -55,14 +56,24 @@ const SAMPLES = {
 // (workspaces.js), user-typed checker targets refused. createWorkspaceRuntime builds the runtime of a new workspace.
 // real: the Real-mode settings (real.js, from the environment; not configured by default). realFetch: the fetch the
 // netguard uses in Real mode (tests pass one that reaches an in-process stub issuer on loopback).
-export function createApp({ runtime, health = createHealth(), webDist = DEFAULT_WEB_DIST, deployMode = 'local', publicOrigin = null, allowedHosts = new Set(), workspaceOptions = {}, createWorkspaceRuntime = () => createRuntime({ ephemeral: true }), customer = loadCustomer(), real = realConfigFrom({}), realFetch } = {}) {
+export function createApp({ runtime, health = createHealth(), webDist = DEFAULT_WEB_DIST, deployMode = 'local', publicOrigin = null, allowedHosts = new Set(), workspaceOptions = {}, createWorkspaceRuntime = () => createRuntime({ ephemeral: true }), customer = loadCustomer(), real = realConfigFrom({}), signin = null, realFetch } = {}) {
   const hosted = deployMode === 'se-mock';
   // Rule 19: the server-side mode. Real only in the local build and only when the owner configured it; the default is
   // Real when configured, else Mock. The netguard refuses every outbound call unless the mode is Real.
   const realOk = !hosted && real.available;
   let source = realOk ? 'real' : 'mock';
-  const guard = createNetguard({ mode: () => source, allowedOrigin: realOk ? real.origin : null, ...(realFetch ? { realFetch } : {}) });
+  const guard = createNetguard({ mode: () => source, allowedOrigin: realOk ? [real.origin, ...(signin ? [signin.pingfederate?.base].filter(Boolean).map((b) => new URL(b).origin) : [])] : null, ...(realFetch ? { realFetch } : {}) });
   const realClient = createRealClient({ config: real, guard });
+  // Real sign-in (authorization code + PKCE + pi.flow): same netguard, same issuer origin. `signin` is the extra
+  // sign-in config (realSigninFrom: providers, per-provider clients); the client is always built so /api/info can
+  // report availability. The merge keeps real's non-enumerable members (scrub, auth, clientId): a plain spread would
+  // silently drop them.
+  const signinConfig = Object.defineProperties({ ...real, ...signin }, {
+    scrub: { value: real.scrub, enumerable: false },
+    auth: { value: real.auth, enumerable: false },
+    clientId: { value: real.clientId, enumerable: false },
+  });
+  const signinClient = createRealSignin({ config: signinConfig, guard });
   health.setRuntime?.(() => (source === 'real' ? 'live' : 'offline'));
   // Every Real answer (result, error message, trace) leaves through here: the whole JSON is scrubbed of the client
   // secret in every encoding, so an issuer that echoes it (in a message, a header, even a token field) cannot leak it.
@@ -106,7 +117,7 @@ export function createApp({ runtime, health = createHealth(), webDist = DEFAULT_
   }));
   // Rule 19: the Mock/Real toggle's API. Real needs the owner's opt-in settings (real.js); the page gets their names and
   // what is missing, never a value of the secret or the client id.
-  const infoBody = () => ({ version: (() => { try { return JSON.parse(fs.readFileSync(new URL('../../package.json', import.meta.url), 'utf8')).version || null; } catch { return null; } })(), mode: deployMode, hosted, source, realAvailable: realOk, real: hosted ? null : realPublicView(real) });
+  const infoBody = () => ({ version: (() => { try { return JSON.parse(fs.readFileSync(new URL('../../package.json', import.meta.url), 'utf8')).version || null; } catch { return null; } })(), mode: deployMode, hosted, source, realAvailable: realOk, real: hosted ? null : { ...realPublicView(real), signin: hosted ? null : { available: signinClient.available(), username: signinClient.available() ? signinClient.username() : null, providers: signinClient.providers(), problems: signinClient.available() ? [] : signinClient.problems(), settings: REAL_SIGNIN_SETTINGS } } });
   api.get('/info', (_req, res) => res.json(infoBody()));
   api.post('/mode', (req, res) => {
     const b = req.body;
@@ -144,6 +155,31 @@ export function createApp({ runtime, health = createHealth(), webDist = DEFAULT_
     const t = Math.floor(req.rt.now());
     // Raw token on purpose: this is a debugging tool. It is signed by a stub key that exists only in this process.
     res.json({ source: 'mock', label: 'MOCK', sample: b.sample, title: s.title, token: req.rt.keyring.sign({}, s.make(req.rt.testerCtx, t)) });
+  }));
+
+  // --- Real sign-in (authorization code + PKCE + pi.flow): access, ID and refresh tokens ---
+  api.post('/signin', wrap(async (req, res) => {
+    if (source !== 'real') return bad(res, 'Sign in is Real only: switch to Real first', 409, 'not_real_mode');
+    const b = takeBody(req, res, ['password', 'provider']); if (!b) return;
+    if (typeof b.password !== 'string') return bad(res, 'password must be a string');
+    if (b.provider !== undefined && !['pingone', 'pingfederate'].includes(b.provider)) return bad(res, 'provider must be pingone or pingfederate');
+    const r = await signinClient.signIn(req.workspaceId, b.password, b.provider || 'pingone');
+    return sendReal(res, { source: 'real', ...r });
+  }));
+  api.post('/signin/refresh', wrap(async (req, res) => {
+    if (source !== 'real') return bad(res, 'Sign in is Real only: switch to Real first', 409, 'not_real_mode');
+    const r = await signinClient.refresh(req.workspaceId);
+    return sendReal(res, { source: 'real', ...r });
+  }));
+  api.post('/signin/signout', wrap((req, res) => {
+    signinClient.signOut(req.workspaceId);
+    res.json({ ok: true });
+  }));
+  api.get('/signin/session', wrap((req, res) => {
+    if (source !== 'real') return res.json({ signedIn: false });
+    const s = signinClient.session(req.workspaceId);
+    if (!s) return res.json({ signedIn: false });
+    return sendReal(res, { signedIn: true, username: signinClient.username(), provider: s.provider === 'pingfederate' ? 'pingfederate' : 'pingone', expiresAt: new Date(s.expiresAt).toISOString(), trace: s.steps || null });
   }));
 
   api.post('/decode', wrap(async (req, res) => {
@@ -237,6 +273,13 @@ export function createApp({ runtime, health = createHealth(), webDist = DEFAULT_
     if (err.code === 'run_queue_full') return res.set('Retry-After', '2').status(429).json({ error: 'run_queue_full', message: 'a run is in progress and another is already queued; try again shortly' });
     // A Real call that failed: the issuer's answer (or the netguard's refusal) and the trace so far, secret already scrubbed.
     if (err instanceof RealError) return sendReal(res, { error: 'real_error', source: 'real', message: err.message, trace: err.trace }, 502);
+    if (err instanceof SignInError) {
+      // A missing/expired session is a 401 (the page offers Sign in again); a rejected password is 401 too; every
+      // other failure (the issuer refused or did not answer) is a 502 with its trace.
+      const msg = err.message || '';
+      const status = msg.includes('no sign-in session') || msg.includes('did not accept the username or password') ? 401 : 502;
+      return sendReal(res, { error: 'signin_error', source: 'real', message: err.message, trace: err.trace }, status);
+    }
     if (err instanceof TargetRefused) return res.status(400).json({ error: 'target_refused', reason: err.reason, message: err.message });
     if (err instanceof URIError || err.status === 400) return bad(res, 'malformed request');
     // Log the error class only: a message could echo part of a token.
@@ -263,7 +306,8 @@ export async function startHttpServer({ port = serverPort(), host = bindHost(), 
   const health = createHealth({ env });
   return new Promise((resolve, reject) => {
     const real = realConfigFrom(deployMode === 'se-mock' ? {} : env);
-    const app = createApp({ runtime: rt, health, deployMode, publicOrigin, allowedHosts, workspaceOptions, real, ...(realFetch ? { realFetch } : {}), ...(webDist !== undefined ? { webDist } : {}) });
+    const signinCfg = realSigninFrom(real, env);
+    const app = createApp({ runtime: rt, health, deployMode, publicOrigin, allowedHosts, workspaceOptions, real, signin: signinCfg, ...(realFetch ? { realFetch } : {}), ...(webDist !== undefined ? { webDist } : {}) });
     const httpServer = app.listen(port, host);
     httpServer.once('error', async (e) => { health.stop(); await app.workspaces?.closeAll(); await rt.close(); reject(e); });
     httpServer.once('listening', () => {

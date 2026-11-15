@@ -65,9 +65,21 @@ export default function App() {
       {health && !health.unreachable && health.state !== "ready" && <div className="banner warn" role="alert">Server health is {health.state}. Run <code>npm run doctor</code>.</div>}
       {hostedBanner && <div className="banner hosted" role="note" data-testid="hosted-banner">{hostedBanner}</div>}
       <ReturnLink app="token-workbench" />
-      <header className="top">
-        <h1>Token Workbench</h1>
-        <TopMenu
+      <header className="shell-bar">
+        <span className="shell-brand">
+          <span className="shell-logo" aria-hidden="true">TW</span>
+          <h1>Token Workbench</h1>
+          {real
+            ? <span className="mode mode--real" data-testid="mode-badge">REAL<span className="sr-only">: calls go to the configured issuer</span></span>
+            : <span className="mode mode--demo" data-testid="mode-badge">DEMO<span className="sr-only">: stub servers on loopback, nothing real is contacted</span></span>}
+        </span>
+        <nav className="tabbar shell-nav" aria-label="Tools">
+          {TABS.map(([id, label]) => (
+            <button key={id} type="button" className="tab" aria-pressed={tab === id} aria-current={tab === id ? "page" : undefined} onClick={() => { setTab(id); setMessage(""); }}>{label}</button>
+          ))}
+        </nav>
+        <span className="shell-right">
+          <TopMenu
           mode={{ value: real ? "real" : "mock", onChange: onSelectMode, realAvailable: info ? info.realAvailable === true : null, realHint: info && !info.realAvailable ? "Real is not configured. Set TW_REAL, TW_REAL_CLIENT_SECRET in the .env file beside docker-compose.yml, then restart the lab." : undefined }}
           theme={{ value: theme, onChange: setTheme }}
           help={{ href: "https://github.com/curtismu7/token-workbench-LAB#readme" }}
@@ -78,19 +90,12 @@ export default function App() {
           <ShelfLink headers={() => ({ "X-Workspace-Id": workspaceId() })} />
           <ReturnLink app="token-workbench" variant="header" />
         </TopMenu>
-        {real
-          ? <span className="mode mode--real" data-testid="mode-badge">REAL<span className="sr-only">: calls go to the configured issuer</span></span>
-          : <span className="mode mode--demo" data-testid="mode-badge">DEMO<span className="sr-only">: stub servers on loopback, nothing real is contacted</span></span>}
-        <nav aria-label="Tools">
-          {TABS.map(([id, label]) => (
-            <button key={id} type="button" className="tab" aria-pressed={tab === id} onClick={() => { setTab(id); setMessage(""); }}>{label}</button>
-          ))}
-        </nav>
+        </span>
       </header>
       <main id="main" tabIndex={-1} className="page">
         <div role="status" aria-live="polite" className="live" data-testid="live">{message}</div>
         <RealStatus info={info} />
-        <div hidden={tab !== "decode"}><Decode key={key} source={key} announce={setMessage} /></div>
+        <div hidden={tab !== "decode"}><Decode key={key} source={key} announce={setMessage} signinProviders={info?.real?.signin?.providers || []} /></div>
         <div hidden={tab !== "tester"}>{real && <StubsOnly />}<Tester key={key} announce={setMessage} /></div>
         <div hidden={tab !== "checker"}><Checker key={key} source={key} issuer={info?.real?.issuer} announce={setMessage} /></div>
         {tab === "flows" && <>{real && <StubsOnly />}<Flows theme={theme} announce={setMessage} /></>}
