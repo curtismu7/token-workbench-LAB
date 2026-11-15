@@ -9,7 +9,6 @@ import { createHash, randomBytes } from 'node:crypto';
 
 const CONTROL = /[\u0000-\u001f\u007f]/;
 const FLOW_ID = /^[A-Za-z0-9-]{1,64}$/;
-const PW_TYPE = 'application/vnd.pingidentity.usernamePassword.check+json';
 export const SIGN_IN_SCOPES = 'openid profile email';
 export const PASSWORD_SHOWN = '[typed by you in the Sign in dialog: sent once to the issuer, never stored, logged or shown]';
 const SECRET_SHOWN = 'Basic [write-only: the client secret is never shown]';
@@ -100,10 +99,11 @@ export function createRealSignin({ config, guard, now = Date.now }) {
 
   const providerCfg = (provider) => {
     // The PingOne issuer (TW_REAL_ISSUER) already ends in /as, so its paths are /authorize, /token and /resume on it.
-    // PingFederate's base has no /as: its paths are /as/authorization.oauth2 and /as/token.oauth2, from discovery.
+    // PingFederate's base has no /as: its paths are /as/authorization.oauth2 and /as/token.oauth2 (from discovery),
+    // its flows API lives at /pf-ws/authn/flows/{id} with the checkUsernamePassword content type and an X-XSRF-Header.
     const p1Base = String(config.issuer || '').replace(/\/as\/?$/, '') || config.issuer;
-    if (provider === 'pingone') return config.pingone?.ok ? { ok: true, clientId: config.pingone.clientId, secret: config.pingone.secret, base: p1Base, redirectUri: realSigninRedirectUri, discovery: false, authorizePath: '/as/authorize', tokenPath: '/as/token' } : { ok: false, problems: config.pingone?.problems || ['PingOne sign-in is not configured'] };
-    return config.pingfederate?.ok ? { ok: true, clientId: config.pingfederate.clientId, secret: config.pingfederate.secret, base: config.pingfederate.base, redirectUri: config.pingfederate.redirectUri, discovery: true } : { ok: false, problems: config.pingfederate?.problems || ['PingFederate sign-in is not configured'] };
+    if (provider === 'pingone') return config.pingone?.ok ? { ok: true, pf: false, clientId: config.pingone.clientId, secret: config.pingone.secret, base: p1Base, redirectUri: realSigninRedirectUri, discovery: false, authorizePath: '/as/authorize', tokenPath: '/as/token', flowsPath: (id) => `/flows/${id}`, pwType: 'application/vnd.pingidentity.usernamePassword.check+json', resumePath: '/as/resume' } : { ok: false, problems: config.pingone?.problems || ['PingOne sign-in is not configured'] };
+    return config.pingfederate?.ok ? { ok: true, pf: true, clientId: config.pingfederate.clientId, secret: config.pingfederate.secret, base: config.pingfederate.base, redirectUri: config.pingfederate.redirectUri, discovery: true, flowsPath: (id) => `/pf-ws/authn/flows/${id}`, pwType: 'application/vnd.pingidentity.checkUsernamePassword+json', resumePath: '/as/resume' } : { ok: false, problems: config.pingfederate?.problems || ['PingFederate sign-in is not configured'] };
   };
 
   const clientBasic = (clientId, secret) => `Basic ${Buffer.from(`${encodeURIComponent(clientId)}:${encodeURIComponent(secret)}`).toString('base64')}`;
@@ -176,13 +176,14 @@ export function createRealSignin({ config, guard, now = Date.now }) {
       let flow = a.json;
       const flowId = a.json.id;
       if (flow.status !== 'USERNAME_PASSWORD_REQUIRED' && flow.status !== 'COMPLETED') throw new SignInError(`${label} asked for a sign-in step this lab does not drive (only username and password). Check the sign-on policy.`, t.entries);
-      // 2. username and password, once, through the flows API (PingOne-shaped on both providers).
+      // 2. username and password, once, through the flows API (PingOne: /flows/{id} + usernamePassword.check;
+      //    PingFederate: /pf-ws/authn/flows/{id} + checkUsernamePassword + X-XSRF-Header).
       if (flow.status === 'USERNAME_PASSWORD_REQUIRED') {
         if (!plain(password, 256)) throw new SignInError('type the password (1 to 256 characters)', t.entries);
         sent = true;
-        const r = await idp(t, `flows API: username and password (${label})`, `${pc.base}/flows/${flowId}`, {
+        const r = await idp(t, `flows API: username and password (${label})`, `${pc.base}${pc.flowsPath(flowId)}`, {
           method: 'POST',
-          headers: { 'content-type': PW_TYPE, accept: '*/*', ...(jar.size ? { cookie: cookieHeader() } : {}) },
+          headers: { 'content-type': pc.pwType, accept: '*/*', ...(pc.pf ? { 'x-xsrf-header': 'PingFederate' } : {}), ...(jar.size ? { cookie: cookieHeader() } : {}) },
           body: JSON.stringify({ username: config.signinUsername, password }),
           shownBody: { username: config.signinUsername, password: PASSWORD_SHOWN },
         });
@@ -196,7 +197,7 @@ export function createRealSignin({ config, guard, now = Date.now }) {
       let code = str(flow.authorizeResponse?.code, 2000);
       let gotState = flow.authorizeResponse?.state;
       if (!code) {
-        const r = await idp(t, 'resume: the authorization code', `${pc.base}/as/resume?flowId=${encodeURIComponent(flowId)}`, { headers: { accept: 'application/json', ...(jar.size ? { cookie: cookieHeader() } : {}) }, shownHeaders: { accept: 'application/json', cookie: shownCookie() } });
+        const r = await idp(t, 'resume: the authorization code', `${pc.base}${pc.resumePath}?flowId=${encodeURIComponent(flowId)}`, { headers: { accept: 'application/json', ...(jar.size ? { cookie: cookieHeader() } : {}) }, shownHeaders: { accept: 'application/json', cookie: shownCookie() } });
         code = str(r.json?.authorizeResponse?.code, 2000); gotState = r.json?.authorizeResponse?.state;
         if (r.status !== 200 || !code) throw new SignInError(`${label} did not hand back an authorization code (HTTP ${r.status})`, t.entries);
       }
