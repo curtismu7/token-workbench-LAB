@@ -31,6 +31,8 @@ code, .mono { font-size: 0.85rem; overflow-wrap: anywhere; }
 @media (max-width: 600px) { .shell-bar { gap: 0.75rem; padding: 0.6rem 1rem; } .tabbar { order: 3; flex-basis: 100%; } }
 
 .btn, .small-btn { white-space: nowrap; }
+/* Lab-local: every button reads as a button — the Ping Red gradient, white label. */
+button { background: var(--accent-gradient); color: var(--on-accent); border-color: var(--primary-edge); }
 .small-btn { min-height: 2rem; padding: 0.2rem 0.7rem; }
 button[aria-disabled="true"] { opacity: 0.75; cursor: not-allowed; }
 button.link { all: unset; cursor: pointer; font-weight: 700; color: var(--status-info); text-decoration: underline; text-underline-offset: 3px; }

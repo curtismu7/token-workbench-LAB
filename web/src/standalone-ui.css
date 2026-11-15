@@ -156,10 +156,6 @@ textarea::placeholder {
 
 button {
   cursor: pointer;
-  /* Every button reads as a button: the Ping Red gradient, white label. */
-  background: var(--accent-gradient);
-  color: var(--on-accent);
-  border-color: var(--primary-edge);
 }
 
 button:disabled {
