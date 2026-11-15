@@ -39,8 +39,14 @@ test('the parser flags an unbound or wildcard publish', () => {
   }
 });
 
-test('compose gives the container no host access: no mounts, docker socket, host network, privilege or live mode', () => {
-  assert.doesNotMatch(code, /^\s*volumes:/m);
+test('compose gives the container no host access: no mounts beyond the read-only CA file, no docker socket, host network, privilege or live mode', () => {
+  // The one allowed mount is the read-only CA file (TW_CA_FILE, a .pem the PingFederate provider needs to verify
+  // the shared PingFederate's mkcert certificate): not a write channel, no socket, no host state.
+  const mounts = [...code.matchAll(/^\s*-\s*(\S+):(\S+):(ro|rw)\s*$/gm)].map((m) => [m[1], m[2], m[3]]);
+  for (const [host, _c, mode] of mounts) {
+    assert.match(mode, /^ro$/, `${host}: every mount is read-only`);
+    assert.match(host, /(\.pem|TW_CA_FILE)$/, `${host}: only the CA file (a .pem) may be mounted`);
+  }
   assert.doesNotMatch(code, /docker\.sock/);
   assert.doesNotMatch(code, /network_mode|privileged|pid:\s*host|TW_LIVE/);
   assert.match(code, /read_only:\s*true/);
