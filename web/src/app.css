@@ -73,7 +73,6 @@ tbody th { font-weight: 700; }
 tr.sel { background: var(--surface-2); }
 tr.detail-row td { padding-top: 0; border-bottom: 1px solid var(--border); }
 summary { cursor: pointer; font-weight: 700; color: var(--status-info); }
-.raw { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 0.8rem; background: var(--surface-2); padding: 0.6rem; border-radius: 6px; margin: 0.4rem 0; }
 .detail { padding: 0.25rem 0 0.5rem; } .detail p { margin: 0.3rem 0; overflow-wrap: anywhere; }
 .checks { margin: 0.4rem 0; padding-left: 1.4rem; font-size: 0.88rem; } .checks .bad { color: var(--danger-text); }
 

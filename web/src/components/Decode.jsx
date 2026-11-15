@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { postDecode, postIntrospect, postMint, postSignIn, postSigninRefresh, postSigninSignout, getSigninSession } from "../lib/api.js";
 import { expiryText, show } from "../lib/format.js";
 import Badge from "./Badge.jsx";
+import Json from "./JsonPane.jsx";
 import Trace from "./Trace.jsx";
 
 const SAMPLES = [["agent", "Agent token"], ["user", "User token"], ["dpop", "DPoP-bound"], ["mtls", "mTLS-bound"], ["expired", "Expired"]];
@@ -11,6 +12,8 @@ const SIG = {
   valid_real_jwks: ["ok", "Signature valid (issuer's real JWKS)"],
   invalid: ["deny", "Signature INVALID"],
 };
+// Keys that matter when reading a decoded token here, on top of the shared defaults (sub, act, aud, scope, client_id, iss, cnf ...).
+const CLAIM_HOT = ["alg", "exp", "nbf", "jkt", "x5t#S256"];
 const LEVEL = { info: null, warn: ["hold", "Warning"], danger: ["deny", "Danger"] };
 
 // source: "mock" or "real" (the server's mode). The component is remounted on a switch, so state never crosses modes.
@@ -23,6 +26,7 @@ export default function Decode({ announce, source = "mock", signinProviders = []
   const [intro, setIntro] = useState(null);
   const [verify, setVerify] = useState(false);
   const [res, setRes] = useState(null);
+  const [decodedToken, setDecodedToken] = useState("");
   const [decodedAt, setDecodedAt] = useState(0);
   const [tick, setTick] = useState(0);
   const [busy, setBusy] = useState(false);
@@ -53,7 +57,7 @@ export default function Decode({ announce, source = "mock", signinProviders = []
     setBusy(true); setError(""); setIntro(null);
     try {
       const d = await postDecode(tok, v);
-      setRes(d); setDecodedAt(Date.now()); setTick(0); setTrace(d.trace || trace);
+      setRes(d); setDecodedToken(tok.trim()); setDecodedAt(Date.now()); setTick(0); setTrace(d.trace || trace);
       announce(`Decoded: ${d.claims.length} claims. ${SIG[d.signature.state][1]}.`);
     } catch (e) { setRes(null); setError(e.message); setTrace(e.data?.trace || null); announce(""); } finally { setBusy(false); }
   };
@@ -181,7 +185,7 @@ export default function Decode({ announce, source = "mock", signinProviders = []
             <Badge kind={intro.source === "real" ? "hold" : "info"}>{intro.source === "real" ? "REAL" : "MOCK"}</Badge>
           </div>
           <p className="note">{intro.source === "real" ? "The configured issuer answered (RFC 7662); its raw answer is in the trace." : intro.note}</p>
-          {intro.response && <pre className="mono raw">{JSON.stringify(intro.response, null, 2)}</pre>}
+          {intro.response && <Json value={intro.response} label="Introspection response (RFC 7662)" testId="introspect-json" hot={["active", "exp"]} />}
         </div>
       )}
       <Trace entries={trace} />
@@ -206,6 +210,8 @@ export default function Decode({ announce, source = "mock", signinProviders = []
           )}
           <div className="card">
             <h3>Claims</h3>
+            <p className="muted small">The decoded token, in its three parts (header, payload, signature):</p>
+            <Json value={decodedToken} label="Decoded token: header, payload, signature" testId="decoded-token" />
             <div className="table-wrap" tabIndex={0} role="region" aria-label="Claims table (scrollable)">
               <table>
                 <caption className="sr-only">Header and payload claims with a plain-English explanation</caption>
@@ -214,7 +220,7 @@ export default function Decode({ announce, source = "mock", signinProviders = []
                   {res.claims.map((c) => (
                     <tr key={c.name}>
                       <th scope="row" className="mono">{c.name}</th>
-                      <td><code>{show(c.value)}</code></td>
+                      <td>{c.value !== null && typeof c.value === "object" ? <Json value={c.value} label={`Claim ${c.name}`} hot={CLAIM_HOT} /> : <code>{show(c.value)}</code>}</td>
                       <td>{LEVEL[c.level] && <><Badge kind={LEVEL[c.level][0]}>{LEVEL[c.level][1]}</Badge>{" "}</>}{c.meaning}</td>
                     </tr>
                   ))}
@@ -223,7 +229,7 @@ export default function Decode({ announce, source = "mock", signinProviders = []
             </div>
             <details>
               <summary>Raw header and payload</summary>
-              <pre className="mono raw">{JSON.stringify({ header: res.header, payload: res.payload }, null, 2)}</pre>
+              <Json value={{ header: res.header, payload: res.payload }} label="Raw header and payload" testId="decoded-json" hot={CLAIM_HOT} />
             </details>
           </div>
         </>
