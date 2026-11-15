@@ -1,10 +1,12 @@
 import React from "react";
 import Badge from "./Badge.jsx";
+import Json from "./JsonPane.jsx";
 
 // The live token flow log of a Real operation: every HTTP exchange with the configured issuer, as sent and as answered.
 // Tokens are raw on purpose (education); the client secret was replaced by the server before this list was sent.
 // Every value is rendered as text, never as HTML.
 const statusKind = (s) => (s === undefined ? "deny" : s >= 200 && s < 300 ? "ok" : s >= 300 && s < 400 ? "hold" : "deny");
+const HOT = ["active", "expires_in", "token_endpoint", "introspection_endpoint", "jwks_uri"];
 const headerText = (h) => Object.entries(h || {}).map(([k, v]) => `${k}: ${v}`).join("\n");
 
 export default function Trace({ entries, title = "REAL trace: HTTP exchanges with the configured issuer" }) {
@@ -25,12 +27,12 @@ export default function Trace({ entries, title = "REAL trace: HTTP exchanges wit
             {e.note && <p className="note small">{e.note}</p>}
             <details>
               <summary>Request</summary>
-              <pre className="mono raw">{`${e.method} ${e.url}\n${headerText(e.request?.headers)}${e.request?.body ? `\n\n${e.request.body}` : ""}`}</pre>
+              <Json value={`${e.method} ${e.url}\n${headerText(e.request?.headers)}${e.request?.body ? `\n\n${e.request.body}` : ""}`} label={`Request ${i + 1}`} hot={HOT} />
             </details>
             {e.response && (
               <details>
                 <summary>Response</summary>
-                <pre className="mono raw">{`HTTP ${e.status}\n${headerText(e.response.headers)}\n\n${e.response.body}${e.response.truncated ? "\n[truncated]" : ""}`}</pre>
+                <Json value={`HTTP ${e.status}\n${headerText(e.response.headers)}\n\n${e.response.body}${e.response.truncated ? "\n[truncated]" : ""}`} label={`Response ${i + 1}`} hot={HOT} />
               </details>
             )}
           </li>

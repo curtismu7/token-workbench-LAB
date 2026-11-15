@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { getTesterCases, postTesterRun } from "../lib/api.js";
 import Badge from "./Badge.jsx";
+import Json from "./JsonPane.jsx";
 
 const expectText = (e) => [e.status, e.error, e.failed && `rejected by: ${e.failed}`].filter(Boolean).join(" | ");
 const actualText = (a) => [a.status, a.error, a.failed_check && `rejected by: ${a.failed_check}`].filter(Boolean).join(" | ");
@@ -64,7 +65,7 @@ export default function Tester({ announce }) {
                             <ol className="checks" aria-label="Checks in order">
                               {r.actual.checks.map((k) => <li key={k.id} className={k.pass ? "" : "bad"}>{k.label}: <strong>{k.pass ? "passed" : "REJECTED HERE"}</strong></li>)}
                             </ol>
-                            <details><summary>Token sent</summary><pre className="mono raw">{r.token ?? "(no token was sent)"}</pre></details>
+                            <details><summary>Token sent</summary><Json value={r.token ?? "(no token was sent)"} label={`Token sent: ${c.title}`} /></details>
                           </div>
                         )}
                       </details>
