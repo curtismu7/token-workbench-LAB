@@ -31,6 +31,10 @@ services:
       TW_REAL_3LO_CLIENT_ID: ${TW_REAL_3LO_CLIENT_ID:-}
       TW_REAL_3LO_CLIENT_SECRET: ${TW_REAL_3LO_CLIENT_SECRET:-}
       TW_REAL_USERNAME: ${TW_REAL_USERNAME:-}
+      # Real sign-in provider 2: PingFederate.
+      TW_REAL_PF_BASE_URL: ${TW_REAL_PF_BASE_URL:-}
+      TW_REAL_PF_CLIENT_ID: ${TW_REAL_PF_CLIENT_ID:-}
+      TW_REAL_PF_CLIENT_SECRET: ${TW_REAL_PF_CLIENT_SECRET:-}
     read_only: true
     cap_drop: [ALL]
     security_opt: ["no-new-privileges:true"]
