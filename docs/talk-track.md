@@ -8,7 +8,7 @@ In Mock (the default) everything on screen is a stub running on this machine. Sa
 
 ## Before you start
 
-Run `npm run build` and `npm start`, open http://127.0.0.1:5910/. Check the header shows the app ready.
+Open https://local.ping-devops.com:8443/token-workbench/ (the lab-proxy; the lab's own port 5910 works too). Check the header shows the app ready. Real mode is owner-configured in the lab's `.env` (rule 26: `WI_REAL_MODE`-style sticky boot applies — after a rebuild, verify `/api/info` still says `real`).
 
 ## Live steps
 
@@ -49,5 +49,5 @@ Only if the owner set the `TW_REAL*` settings (README "Real mode"); otherwise th
 ## Reset before the next demo
 
 1. Click **Reset** on the Flow catalog tab and reload the page (clears pasted tokens and results).
-2. For a clean state, stop the server and run `npm start` again; stub keys are regenerated in memory.
+2. For a clean state, `docker compose up -d --build` in the lab's checkout; stub keys are regenerated in memory. After a rebuild from a fresh checkout, copy the canonical `.env` beside `docker-compose.yml` first (rule 26) and check `/api/info` still says `real`.
 3. Run `npm run doctor` if the ports look busy (5910 app, 5911-5916 stubs).
