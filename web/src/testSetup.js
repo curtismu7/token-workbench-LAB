@@ -3,6 +3,10 @@ import "@testing-library/jest-dom/vitest";
 // React Flow measures the DOM; jsdom has no layout, so give it the few browser APIs it reads.
 class RO { observe() {} unobserve() {} disconnect() {} }
 globalThis.ResizeObserver = globalThis.ResizeObserver || RO;
+// The decode result hint watches visibility; jsdom has no IntersectionObserver. Report "visible" so the hint stays hidden in tests.
+class IO { constructor(cb) { this.cb = cb; } observe(el) { this.cb?.([{ isIntersecting: true, target: el }]); } unobserve() {} disconnect() {} }
+globalThis.IntersectionObserver = globalThis.IntersectionObserver || IO;
+globalThis.Element.prototype.scrollIntoView = globalThis.Element.prototype.scrollIntoView || (() => {});
 globalThis.DOMMatrixReadOnly = globalThis.DOMMatrixReadOnly || class { constructor() { this.m22 = 1; } };
 Object.defineProperties(HTMLElement.prototype, {
   offsetWidth: { configurable: true, get() { return 200; } },

@@ -33,6 +33,7 @@ import React from "react";
  *                    With href: a link that opens in a new tab. Without href: a button that calls onClick
  *                    (default: go to #readme). label defaults to "Help", title to "Open this lab's documentation"
  *   version         string — About/version button label (e.g. "v1.4.2", from the lab's VERSION file); omit when unknown
+ *   onVersion       fn — what the version button does when clicked (e.g. open release notes); omit for an inert button
  *   onReset          fn; when given renders the Reset button
  *   showSignIn       bool — true only when Real mode is active and the lab needs auth
  *   signedIn         { subject, onSignIn, onSignOut } — when signed in shows "Signed in as <subject>" + Sign out
@@ -55,6 +56,7 @@ export default function TopMenu({
   shelfUrl,
   help,
   version,
+  onVersion,
   onReset,
   showSignIn = false,
   signedIn,
@@ -137,7 +139,7 @@ export default function TopMenu({
             </button>
           ))}
         {version && (
-          <button type="button" data-testid="version" title="About this lab">{version}</button>
+          <button type="button" data-testid="version" title="About this lab" onClick={onVersion}>{version}</button>
         )}
         {onReset && (
           <button type="button" data-testid="reset" onClick={onReset}>Reset</button>

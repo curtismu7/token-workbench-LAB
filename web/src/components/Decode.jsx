@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { postDecode, postIntrospect, postMint, postSignIn, postSigninRefresh, postSigninSignout, getSigninSession } from "../lib/api.js";
 import { expiryText, show } from "../lib/format.js";
 import Badge from "./Badge.jsx";
@@ -31,6 +31,8 @@ export default function Decode({ announce, source = "mock", signinProviders = []
   const [tick, setTick] = useState(0);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [showHint, setShowHint] = useState(false); // "results are below" hint: on when a result exists and it is not in view
+  const resultRef = useRef(null);
   // Real sign-in: the three tokens from the pi.flow sign-in, the kind being viewed, and the dialog's fields.
   const [userTokens, setUserTokens] = useState(null); // [{kind, label, token, header, claims}] or null
   const [viewKind, setViewKind] = useState("access");
@@ -51,6 +53,19 @@ export default function Decode({ announce, source = "mock", signinProviders = []
     if (!res?.time?.hasExp) return undefined;
     const t = setInterval(() => setTick((n) => n + 1), 1000);
     return () => clearInterval(t);
+  }, [res]);
+
+  // The decoded result sits at the bottom of the page, below the token form and the trace. After a decode
+  // (or introspect) bring it into view once, and while it is off screen show the "results below" hint with
+  // an arrow; clicking the hint scrolls to the result. IntersectionObserver drives the hint both ways.
+  useEffect(() => {
+    if (!res) { setShowHint(false); return undefined; }
+    const el = resultRef.current;
+    if (!el) return undefined;
+    el.scrollIntoView({ behavior: "smooth", block: "start" });
+    const io = new IntersectionObserver(([e]) => setShowHint(!e.isIntersecting), { threshold: 0.15 });
+    io.observe(el);
+    return () => io.disconnect();
   }, [res]);
 
   const run = async (tok = token, v = verify) => {
@@ -189,9 +204,14 @@ export default function Decode({ announce, source = "mock", signinProviders = []
         </div>
       )}
       <Trace entries={trace} />
+      {showHint && (
+        <button type="button" className="result-hint" data-testid="result-hint" onClick={() => resultRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })}>
+          Results below <span aria-hidden="true">↓</span>
+        </button>
+      )}
       {res && (
         <>
-          <div className="card result" data-testid="decode-result">
+          <div className="card result" ref={resultRef} data-testid="decode-result">
             <div className="row">
               <Badge kind={SIG[res.signature.state][0]}>{SIG[res.signature.state][1]}</Badge>
               {res.time.hasExp && (

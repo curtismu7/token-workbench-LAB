@@ -8,6 +8,7 @@ import Checker from "./components/Checker.jsx";
 import Flows from "./components/Flows.jsx";
 import Story from "./components/Story.jsx";
 import TalkTrack from "./components/TalkTrack.jsx";
+import ReleaseNotes from "./components/ReleaseNotes.jsx";
 import TopMenu from "./top-menu/TopMenu";
 import RealStatus from "./components/RealStatus.jsx";
 import { workspaceId } from "./lib/api.js";
@@ -34,6 +35,7 @@ export default function App() {
   const [message, setMessage] = useState("");
   const [hostedBanner, setHostedBanner] = useState(null);
   const [info, setInfo] = useState(null);
+  const [notesOpen, setNotesOpen] = useState(false);
 
   useEffect(() => {
     if (theme === "auto") document.documentElement.removeAttribute("data-theme");
@@ -85,6 +87,7 @@ export default function App() {
           theme={{ value: theme, onChange: setTheme }}
           help={{ href: "https://github.com/curtismu7/token-workbench-LAB#readme" }}
           version={info?.version || null}
+          onVersion={() => setNotesOpen(true)}
           onReset={onReset}
           talkTrack={{ active: tab === "talk", onToggle: () => { setTab("talk"); setMessage(""); } }}
         >
@@ -102,6 +105,7 @@ export default function App() {
         <div hidden={tab !== "checker"}><Checker key={key} source={key} issuer={info?.real?.issuer} announce={setMessage} /></div>
         {tab === "flows" && <>{real && <StubsOnly />}<Flows theme={theme} announce={setMessage} /></>}
         {tab === "talk" && <TalkTrack />}
+        {notesOpen && <ReleaseNotes version={info?.version || ""} onClose={() => setNotesOpen(false)} />}
         <Story active={tab} />
       </main>
     </>
