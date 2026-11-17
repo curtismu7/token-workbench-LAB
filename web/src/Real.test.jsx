@@ -4,6 +4,7 @@ import React from "react";
 import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import App from "./App.jsx";
+import ModeToggle from "./components/ModeToggle.jsx";
 import { CASES, COMPARE, HEALTH, META, decoded, fakeToken, stubFetch } from "./test/fixtures.js";
 
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
@@ -28,6 +29,12 @@ const TRACE = [
 const base = (info) => ({ "GET /api/health": HEALTH, "GET /api/meta": META, "GET /api/info": info, "GET /api/tester/cases": { cases: CASES }, "GET /api/flows/compare": COMPARE });
 
 describe("Real not configured", () => {
+  it("the toggle's Real button is disabled and names exactly the missing settings", () => {
+    render(<ModeToggle info={INFO_OFF} onSelect={() => {}} />);
+    expect(screen.getByTestId("mode-real")).toBeDisabled();
+    expect(screen.getByTestId("mode-real").title).toBe("Real is not configured. Set TW_REAL, TW_REAL_CLIENT_SECRET in the .env file beside docker-compose.yml, then restart the lab.");
+  });
+
   it("the page shows the MOCK banner first and a 'Real not configured' card with every setting and what is missing", async () => {
     stubFetch(base(INFO_OFF));
     render(<App />);
@@ -48,7 +55,7 @@ describe("Real not configured", () => {
     stubFetch(base(INFO_REAL)); const { unmount } = render(<App />);
     await screen.findByText(/REAL: Decode/); expect(screen.queryByTestId("real-status")).toBeNull(); unmount();
     stubFetch(base({ mode: "se-mock", hosted: true, source: "mock", realAvailable: false, real: null }));
-    render(<App />); await waitFor(() => expect(screen.getByTestId("mode-badge")).toHaveTextContent("DEMO"));
+    render(<App />); await waitFor(() => expect(screen.getByTestId("mode-select")).toHaveValue("mock"));
     expect(screen.queryByTestId("real-status")).toBeNull();
   });
 });
@@ -75,7 +82,7 @@ describe("Real mode", () => {
     stubFetch({ ...base(INFO_REAL), "POST /api/mint": { __status: 502, body: { error: "real_error", message: "the token endpoint answered 401 (invalid_client)", trace: [{ ...TRACE[1], status: 401 }] } } });
     render(<App />);
     await userEvent.click(await screen.findByRole("button", { name: "REAL client_credentials token" }));
-    await waitFor(() => expect(screen.getByTestId("mode-badge")).toHaveTextContent("REAL"));
+    await waitFor(() => expect(screen.getByTestId("mode-select")).toHaveValue("real"));
     expect(await screen.findByRole("alert")).toHaveTextContent("invalid_client");
     expect(screen.getByTestId("trace")).toHaveTextContent("HTTP 401");
   });
@@ -112,12 +119,19 @@ describe("Real mode", () => {
     expect(screen.getAllByTestId("real-note").length).toBeGreaterThanOrEqual(1);
   });
 
-  it("the mode never changes at runtime: there is no toggle and /api/mode is not called", async () => {
-    stubFetch({ ...base(INFO_REAL), "POST /api/mint": { source: "real", label: "REAL", token: fakeToken(), trace: TRACE } });
+  it("switching Real -> Mock reloads the tabs: the REAL token and trace are gone and the stub samples are back", async () => {
+    stubFetch({ ...base(INFO_REAL), "POST /api/mint": { source: "real", label: "REAL", token: fakeToken(), trace: TRACE }, "POST /api/decode": decoded(), "POST /api/mode": (b) => ({ ...INFO_REAL, source: b.source }) });
     render(<App />);
     await userEvent.click(await screen.findByRole("button", { name: "REAL client_credentials token" }));
-    await waitFor(() => expect(screen.getByTestId("token-label")).toHaveTextContent("REAL"));
-    expect(screen.queryByTestId("mode-select")).toBeNull();
+    await waitFor(() => expect(screen.getByTestId("mode-select")).toHaveValue("real"));
+    await screen.findByTestId("trace");
+    await userEvent.selectOptions(screen.getByTestId("mode-select"), "mock");
+    await waitFor(() => expect(screen.getByTestId("mode-banner")).toHaveTextContent(/^MOCK:/));
+    expect(screen.queryByTestId("trace")).toBeNull();
+    expect(screen.queryByTestId("token-label")).toBeNull();
+    expect(screen.getByLabelText("Token (JWT)")).toHaveValue("");
+    expect(screen.getByRole("button", { name: "DPoP-bound" })).toBeInTheDocument();
+    expect(screen.getByTestId("mode-badge")).toHaveTextContent("DEMO");
   });
 
   it("a mock token is labelled MOCK", async () => {
