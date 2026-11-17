@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import ShelfLink from "./components/ShelfLink.jsx";
 import VerifyMark from "./components/VerifyMark.jsx";
-import { getHealth, getInfo, getMeta, postReset, setMode } from "./lib/api.js";
+import { getHealth, getInfo, getMeta, postReset } from "./lib/api.js";
 import Decode from "./components/Decode.jsx";
 import Tester from "./components/Tester.jsx";
 import Checker from "./components/Checker.jsx";
@@ -46,17 +46,13 @@ export default function App() {
   useEffect(() => { getMeta().then((m) => setHostedBanner(m?.hosted && typeof m.banner === "string" ? m.banner : null), () => {}); }, []);
   useEffect(() => { getHealth().then(setHealth, () => setHealth({ unreachable: true })); }, []);
   useEffect(() => { getInfo().then(setInfo, () => {}); }, []);
-  // Rule 19: the Mock/Real toggle. A switch is announced and the server's answer is what the toggle shows; every tab is
-  // keyed on the mode, so it reloads its data after a switch.
-  const onSelectMode = async (source) => {
-    try { setInfo(await setMode(source)); setMessage(`Mode: ${source === "real" ? "Real" : "Mock"}.`); } catch (e) { setMessage(e.message); }
-  };
+  // The lab's mode is a server-side fact: Real when the owner configured TW_REAL, Mock otherwise. There is no
+  // user-facing toggle — a page that can do Real should always show Real, not offer a switch back to stubs.
+  const real = info?.source === "real";
   // Reset (rule 3): the server drops every non-default workspace's runtime state; the tabs re-key on the source.
   const onReset = async () => {
     try { const r = await postReset(); setMessage(r?.note ? `Reset: ${r.note}` : "Reset: the lab's runtime state is back to defaults."); } catch (e) { setMessage(e.message); }
   };
-
-  const real = info?.source === "real";
   const key = info?.source || "mock";
   return (
     <>
@@ -83,7 +79,6 @@ export default function App() {
         </nav>
         <span className="shell-right">
           <TopMenu
-          mode={{ value: real ? "real" : "mock", onChange: onSelectMode, realAvailable: info ? info.realAvailable === true : null, realHint: info && !info.realAvailable ? "Real is not configured. Set TW_REAL, TW_REAL_CLIENT_SECRET in the .env file beside docker-compose.yml, then restart the lab." : undefined }}
           theme={{ value: theme, onChange: setTheme }}
           help={{ href: "https://github.com/curtismu7/token-workbench-LAB#readme" }}
           version={info?.version || null}
