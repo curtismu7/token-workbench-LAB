@@ -116,3 +116,11 @@ summary { cursor: pointer; font-weight: 700; color: var(--status-info); }
 
 .talk { max-width: 52rem; }
 .talk__step { padding-left: 8px; border-left: 3px solid var(--accent); }
+
+/* Release notes dialog (opened by the version button). */
+.rn-backdrop { position: fixed; inset: 0; z-index: 60; display: grid; place-items: center; background: rgb(0 0 0 / 0.45); }
+.rn-dialog { width: min(34rem, calc(100vw - 2rem)); max-height: min(80vh, 40rem); overflow: auto; border: 1px solid var(--border); border-radius: 10px; padding: 1.25rem 1.5rem; background: var(--surface); color: var(--text); }
+.rn-dialog h2 { margin-top: 0; }
+.rn-dialog ul { padding-left: 1.2rem; }
+.rn-dialog li { margin: 0.4rem 0; }
+.rn-dialog code { overflow-wrap: anywhere; }
