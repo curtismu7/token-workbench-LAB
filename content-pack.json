@@ -2,7 +2,7 @@
   "schema": "demo-content-pack/1",
   "id": "token-workbench",
   "title": "Token Workbench",
-  "version": "0.1.0",
+  "version": "3.0.0",
   "demo": {
     "id": "token-workbench",
     "name": "Token Workbench",
