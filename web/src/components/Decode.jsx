@@ -231,7 +231,7 @@ export default function Decode({ announce, source = "mock", signinProviders = []
           <div className="card">
             <h3>Claims</h3>
             <p className="muted small">The decoded token, in its three parts (header, payload, signature):</p>
-            <Json value={decodedToken} label="Decoded token: header, payload, signature" testId="decoded-token" />
+            <Json value={decodedToken} label="Decoded token: header, payload, signature" testId="decoded-token" decode={false} />
             <div className="table-wrap" tabIndex={0} role="region" aria-label="Claims table (scrollable)">
               <table>
                 <caption className="sr-only">Header and payload claims with a plain-English explanation</caption>
