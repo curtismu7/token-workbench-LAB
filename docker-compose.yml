@@ -13,6 +13,10 @@ services:
     # The local PingFederate serves a mkcert certificate: trust the mkcert root when TW_CA_FILE is set.
     volumes:
       - ${TW_CA_FILE:-/dev/null.invalid}:${TW_CA_FILE:-/dev/null.invalid}:ro
+    # Real sign-in to the shared local PingFederate: the .env names https://local.ping-devops.com:<port>, which must
+    # resolve to the HOST (the PF port is published on the host's loopback), not to the container itself.
+    extra_hosts:
+      - "local.ping-devops.com:host-gateway"
     environment:
       NODE_EXTRA_CA_CERTS: ${TW_CA_FILE:-}
       SHELF_URL: ${SHELF_URL:-http://127.0.0.1:4400}
