@@ -62,7 +62,7 @@ export default function Checker({ announce, source = "mock", issuer }) {
 
   return (
     <section aria-labelledby="h-checker">
-      <h2 id="h-checker">OAuth profile checker</h2>
+      <h2 id="h-checker"><span className="step-num" aria-hidden="true">1</span>OAuth profile checker</h2>
       {real ? (
         <p className="lede" data-testid="checker-real">REAL: reads the published metadata of the configured issuer{issuer ? ` (${issuer})` : ""} with one GET and judges both packs from it. Rules that need active probes (crafted authorization and token requests) are NOT CHECKED: this lab never sends them to a real issuer. A PASS here means "advertised", not "enforced".</p>
       ) : <p className="lede">Pick one of the five stub authorization servers{hosted ? "" : ", or a loopback URL you started yourself,"} and probe it against an RFC 9700 pack and a simplified FAPI 2.0 pack. No credentials are sent and {hosted ? "only the simulated stub servers in this hosted demo are probed." : "nothing leaves this machine."}</p>}

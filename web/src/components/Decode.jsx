@@ -131,7 +131,7 @@ export default function Decode({ announce, source = "mock", signinProviders = []
 
   return (
     <section aria-labelledby="h-decode">
-      <h2 id="h-decode">Decode and trace a token</h2>
+      <h2 id="h-decode"><span className="step-num" aria-hidden="true">1</span>Decode and trace a token</h2>
       {real
         ? <p className="lede">REAL: get an access token from the configured issuer with the client_credentials grant, verify a token against the issuer's real JWKS, or introspect it at the issuer. Decoding itself still makes no network call. Every request to the issuer is listed in the trace below. Raw tokens are shown on purpose, because this is a debugging tool; they are never logged.</p>
         : <p className="lede">Paste a JWT or mint a sample signed by the stub issuer. The token is decoded in the server without a network call and every claim is explained. Raw tokens are shown on purpose, because this is a debugging tool; they are never logged or sent anywhere.</p>}
