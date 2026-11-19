@@ -76,7 +76,8 @@ summary { cursor: pointer; font-weight: 700; color: var(--status-info); }
 .detail { padding: 0.25rem 0 0.5rem; } .detail p { margin: 0.3rem 0; overflow-wrap: anywhere; }
 .checks { margin: 0.4rem 0; padding-left: 1.4rem; font-size: 0.88rem; } .checks .bad { color: var(--danger-text); }
 
-.story ol { display: grid; grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr)); gap: 0.6rem; list-style: none; padding: 0; margin: 1rem 0; }
+.story ol { display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem; list-style: none; padding: 0; margin: 1rem 0; }
+@media (max-width: 900px) { .story ol { grid-template-columns: 1fr; } }
 .story li { display: flex; flex-direction: column; gap: 0.2rem; padding: 0.6rem 0.75rem; border: 1px solid var(--border); border-left: 4px solid var(--border); border-radius: 8px; background: var(--surface); font-size: 0.88rem; }
 .story li.now { border-color: var(--accent); border-left-color: var(--accent); box-shadow: 0 0 0 2px var(--accent); }
 .story li span { color: var(--muted); }
@@ -98,7 +99,10 @@ summary { cursor: pointer; font-weight: 700; color: var(--status-info); }
 .step-edge.now.evil path { stroke: var(--danger-text); }
 .step-edge .num-bg { fill: var(--surface); stroke: var(--muted); } .step-edge .num { fill: var(--text); font: 700 11px var(--font-mono); }
 .react-flow__arrowhead path { fill: var(--muted); stroke: var(--muted); }
-.sides { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(20rem, 100%), 1fr)); gap: 1rem; }
+.sides { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+@media (max-width: 900px) { .sides { grid-template-columns: 1fr; } }
+.step-num { display: inline-grid; place-items: center; min-width: 1.4rem; height: 1.4rem; border-radius: 999px;
+  background: var(--accent-gradient); color: var(--on-accent); font: 700 0.75rem var(--font-mono); margin-right: 0.5em; vertical-align: 2px; }
 .sides .card { margin: 0.5rem 0; }
 .steps { padding-left: 1.3rem; font-size: 0.9rem; } .steps li { margin: 0.3rem 0; overflow-wrap: anywhere; } .steps .who { font-weight: 700; }
 .steps li.evil { color: var(--danger-text); }

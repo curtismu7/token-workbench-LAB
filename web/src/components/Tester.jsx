@@ -29,7 +29,7 @@ export default function Tester({ announce }) {
 
   return (
     <section aria-labelledby="h-tester">
-      <h2 id="h-tester">Wrong-token tester</h2>
+      <h2 id="h-tester"><span className="step-num" aria-hidden="true">1</span>Wrong-token tester</h2>
       <p className="lede">Fifteen tokens, each wrong in one way (or a control that is right), are sent to a stub MCP-style resource server on loopback. Each row compares what a correct server must answer with what the stub answered, including the <code>WWW-Authenticate</code> challenge and which check did the rejecting. PASS means the stub gave the correct answer for that case.</p>
       <div className="row">
         <button type="button" className="btn primary" onClick={() => run("all")} disabled={busy}>Run all {cases.length || 15} cases</button>
