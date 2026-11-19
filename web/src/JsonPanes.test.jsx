@@ -17,7 +17,7 @@ beforeEach(() => setJsonView("form"));
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 
 describe("decode tab", () => {
-  it("shows the decoded token in three colored parts and the claims as Form | JSON panes", async () => {
+  it("shows the decoded token as Header / Payload / Signature panes (Rule 24b) and the claims as Form | JSON panes", async () => {
     const claims = [
       { name: "alg", value: "ES256", meaning: "The signature algorithm.", level: "info" },
       { name: "act", value: { sub: "agent-7" }, meaning: "The actor.", level: "info" },
@@ -26,9 +26,12 @@ describe("decode tab", () => {
     render(<App />);
     await userEvent.type(screen.getByLabelText("Token (JWT)"), fakeToken());
     await userEvent.click(screen.getByRole("button", { name: "Decode" }));
-    const tok = await screen.findByTestId("decoded-token");
-    for (const part of ["jwt1", "jwt2", "jwt3"]) expect(tok.querySelectorAll(`.jtok--${part}`)).toHaveLength(1);
-    expect(tok).toHaveTextContent(fakeToken());
+    // TokenParts renders Header / Payload / Signature headings with standard panes; the payload pane keeps decoded-token.
+    const payload = await screen.findByTestId("decoded-token");
+    const section = payload.closest(".card");
+    for (const h of ["Header", "Payload", "Signature"]) expect(within(section).getByText(h)).toBeTruthy();
+    expect(section).toHaveTextContent("ES256");
+    expect(section).toHaveTextContent("agent-7");
 
     // an object claim value (act) is a pane with the Form | JSON toggle, not compact JSON text in a <code>
     const act = screen.getByRole("group", { name: "Claim act view" });
