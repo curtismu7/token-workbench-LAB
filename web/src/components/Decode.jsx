@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { postDecode, postIntrospect, postMint, postSignIn, postSigninRefresh, postSigninSignout, getSigninSession } from "../lib/api.js";
 import { expiryText, show } from "../lib/format.js";
 import Badge from "./Badge.jsx";
-import Json from "./JsonPane.jsx";
+import Json, { TokenParts } from "./JsonPane.jsx";
 import Trace from "./Trace.jsx";
 
 const SAMPLES = [["agent", "Agent token"], ["user", "User token"], ["dpop", "DPoP-bound"], ["mtls", "mTLS-bound"], ["expired", "Expired"]];
@@ -231,7 +231,7 @@ export default function Decode({ announce, source = "mock", signinProviders = []
           <div className="card">
             <h3>Claims</h3>
             <p className="muted small">The decoded token, in its three parts (header, payload, signature):</p>
-            <Json value={decodedToken} label="Decoded token: header, payload, signature" testId="decoded-token" decode={false} />
+            <TokenParts raw={decodedToken} label="Decoded token" claimsTestId="decoded-token" hot={CLAIM_HOT} />
             <div className="table-wrap" tabIndex={0} role="region" aria-label="Claims table (scrollable)">
               <table>
                 <caption className="sr-only">Header and payload claims with a plain-English explanation</caption>
