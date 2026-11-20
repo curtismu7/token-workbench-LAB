@@ -131,3 +131,12 @@ summary { cursor: pointer; font-weight: 700; color: var(--status-info); }
 
 /* "Results below" hint: shown while the decoded result is scrolled out of view. */
 .result-hint { position: fixed; bottom: 1rem; left: 50%; transform: translateX(-50%); z-index: 40; padding: 0.45rem 1rem; border-radius: 999px; border: 1px solid var(--border); background: var(--surface); color: var(--text); font-weight: 700; box-shadow: var(--hint-shadow); cursor: pointer; }
+
+/* An expanded box (diagram kit §8c): give it a width the details can be read at. */
+.react-flow__node.dk-open {
+  width: 320px;
+}
+.react-flow__node.dk-open .fbox {
+  max-height: 420px;
+  overflow-y: auto;
+}

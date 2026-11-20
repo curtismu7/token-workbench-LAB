@@ -1,6 +1,9 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { BaseEdge, Background, Controls, Handle, MarkerType, Position, ReactFlow, applyNodeChanges } from "@xyflow/react";
+import { Background, Controls, Handle, MarkerType, Position, ReactFlow } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
+import { ArrowNoLabel, EdgeLabels, FitOpen, Passport, PassportActions } from "../diagram-kit/DiagramKit.jsx";
+import { boxPassport, sidePoint } from "../diagram-kit/diagramKit.js";
+import "../diagram-kit/diagram-kit.css";
 import { getFlowCompare, postFlowRun } from "../lib/api.js";
 import Badge from "./Badge.jsx";
 
@@ -15,36 +18,25 @@ const START = [
   { id: "rs", position: { x: 840, y: 130 } },
   { id: "attacker", position: { x: 560, y: 290 } },
 ].map((n) => ({ ...n, type: "actor", data: { title: ACTORS[n.id] } }));
-const HALF = { w: 80, h: 30 };
 const SPEEDS = [["0.5", "0.5x"], ["1", "1x"], ["2", "2x"], ["4", "4x"]];
 const BASE_MS = 1700;
 
 function Actor({ data }) {
   return (
     <div className={`fbox${data.on ? " on" : ""}${data.dim ? " dim" : ""}${data.evil ? " evil" : ""}`}>
-      <Handle id="t" type="target" position={Position.Left} style={{ left: "50%", top: "50%", opacity: 0 }} isConnectable={false} />
-      <Handle id="s" type="source" position={Position.Right} style={{ left: "50%", top: "50%", opacity: 0 }} isConnectable={false} />
+      <Handle id="t" type="target" position={Position.Left} />
+      <Handle id="s" type="source" position={Position.Right} />
       <strong>{data.title}</strong>
       {data.tag && <span>{data.tag}</span>}
+      {data.passport && <Passport p={data.passport} />}
     </div>
   );
 }
 
-// An arrow from box edge to box edge, nudged sideways so a pair of opposite arrows do not overlap, numbered at the middle.
-function StepEdge({ id, sourceX, sourceY, targetX, targetY, markerEnd, data }) {
-  const dx = targetX - sourceX; const dy = targetY - sourceY;
-  const len = Math.hypot(dx, dy) || 1;
-  const t = Math.min(HALF.w / (Math.abs(dx) || 1e-6), HALF.h / (Math.abs(dy) || 1e-6)) + 0.02;
-  const nx = (-dy / len) * 11; const ny = (dx / len) * 11;
-  const sx = sourceX + dx * t + nx; const sy = sourceY + dy * t + ny;
-  const ex = targetX - dx * t + nx; const ey = targetY - dy * t + ny;
-  return (
-    <g className={`step-edge ${data.state} ${data.evil ? "evil" : ""}`}>
-      <BaseEdge id={id} path={`M ${sx} ${sy} L ${ex} ${ey}`} markerEnd={markerEnd} />
-      <circle cx={(sx + ex) / 2} cy={(sy + ey) / 2} r={11} className="num-bg" />
-      <text x={(sx + ex) / 2} y={(sy + ey) / 2} className="num" textAnchor="middle" dominantBaseline="central">{data.n}</text>
-    </g>
-  );
+// The curve only: every label is drawn by the diagram kit's EdgeLabels, in a layer above the boxes,
+// placed so no two labels overlap and none sits on a box (the shared standard, UI patterns §8c).
+function StepEdge(props) {
+  return <ArrowNoLabel {...props} className={`step-edge ${props.data?.state ?? "idle"}${props.data?.evil ? " evil" : ""}`} />;
 }
 const nodeTypes = { actor: Actor };
 const edgeTypes = { step: StepEdge };
@@ -93,20 +85,42 @@ export default function Flows({ theme, announce }) {
   }, [running, step, steps.length, speed]);
 
   const simulate = () => { if (!cur || running) return; setStep(0); setRunning(true); announce(`Simulating ${cur.mechanism.name} ${prot ? "with" : "without"} protection.`); };
-  const reset = () => { setRunning(false); setStep(-1); setMoved(START); announce("Diagram reset."); };
-  const onNodesChange = useCallback((c) => setMoved((n) => applyNodeChanges(c, n)), []);
+  const reset = () => { setRunning(false); setStep(-1); setOpen(null); setMoved(START); announce("Diagram reset."); };
+  const onNodesChange = useCallback((c) => setMoved((n) => n.map((x) => { const ch = c.find((y) => y.id === x.id); return ch?.position ? { ...x, position: ch.position } : x; })), []);
+
+  // Click a box and it expands in place with its details (the shared diagram kit's Passport, §8c).
+  const [open, setOpen] = useState(null);
+  const graph = useMemo(() => ({
+    nodes: START.map((n) => ({ id: n.id, label: ACTORS[n.id], group: n.id === "attacker" ? "attacker" : "actor" })),
+    edges: steps.map((s) => ({ source: s.from, target: s.to, label: `${s.n}. ${s.label}` })),
+    groups: { actor: { label: "Actor" }, attacker: { label: "Attacker" } },
+  }), [steps]);
+  const passportFor = useMemo(() => (nid) => boxPassport(graph, nid), [graph]);
 
   const done = step >= steps.length && steps.length > 0;
   const now = step >= 0 && step < steps.length ? steps[step] : null;
   const nodes = useMemo(() => moved.map((n) => {
     const active = now && (now.from === n.id || now.to === n.id);
-    return { ...n, ariaLabel: n.data.title, data: { ...n.data, on: !!active, dim: !!now && !active, evil: n.id === "attacker", tag: done && cur && n.id === "attacker" ? (cur.attack.outcome === "attack_blocked" ? "blocked" : "succeeded") : undefined } };
-  }), [moved, now, done, cur]);
+    return { ...n, ariaLabel: n.data.title, zIndex: n.id === open ? 10 : undefined, className: n.id === open ? "dk-open" : undefined,
+      data: { ...n.data, on: !!active, dim: !!now && !active, evil: n.id === "attacker", tag: done && cur && n.id === "attacker" ? (cur.attack.outcome === "attack_blocked" ? "blocked" : "succeeded") : undefined,
+        passport: n.id === open ? passportFor(n.id) : null } };
+  }), [moved, now, done, cur, open, passportFor]);
   const edges = useMemo(() => steps.filter((s) => s.from !== s.to).map((s) => ({
     id: `s${s.n}`, source: s.from, target: s.to, type: "step", sourceHandle: "s", targetHandle: "t",
     markerEnd: { type: MarkerType.ArrowClosed },
     data: { n: s.n, evil: s.evil, state: step < 0 ? "idle" : s.n - 1 === step ? "now" : s.n - 1 < step ? "past" : "future" },
   })), [steps, step]);
+  // One label item per arrow, for the kit's EdgeLabels layer: the arrows run left to right on the facing sides.
+  const items = useMemo(() => steps.filter((s) => s.from !== s.to).map((s) => ({
+    id: `s${s.n}`, text: `${s.n}. ${s.label}`, source: s.from, target: s.to, sourceHandle: "r", targetHandle: "l",
+    active: step >= 0 && s.n - 1 === step, dim: step >= 0 && s.n - 1 !== step,
+  })), [steps, step]);
+  const labelPointFor = useCallback((box, handle) => sidePoint(box, handle === "s" ? "r" : "l"), []);
+  const actions = useMemo(() => ({
+    open: (nid) => setOpen(nid),
+    close: () => setOpen(null),
+    link: (nid) => { const u = new URL(window.location.href); u.searchParams.set("box", nid); return u.toString(); },
+  }), []);
 
   const caption = !cur ? "Loading." : now ? `Step ${now.n} of ${steps.length}: ${ACTORS[now.from]} to ${ACTORS[now.to]}: ${now.label}`
     : done ? `${cur.attack.outcome === "attack_blocked" ? "Attack blocked" : "Attack succeeded"}: ${cur.attack.reason}` : "Press Simulate to walk the flow step by step.";
@@ -131,11 +145,16 @@ export default function Flows({ theme, announce }) {
       </div>
       <div className="flow-scroll" tabIndex={0} role="region" aria-label="Diagram area (scrollable on narrow screens)">
       <div className="flow-wrap" role="group" aria-label={`${cur?.mechanism.name ?? ""} flow diagram between client, browser, authorization server, resource server and attacker. Boxes can be dragged. The steps are listed below.`}>
-        <ReactFlow nodes={nodes} edges={edges} nodeTypes={nodeTypes} edgeTypes={edgeTypes} onNodesChange={onNodesChange} colorMode={theme}
-          fitView fitViewOptions={{ padding: 0.1 }} nodesConnectable={false} proOptions={{ hideAttribution: true }} minZoom={0.2}>
-          <Background />
-          <Controls showInteractive={false} />
-        </ReactFlow>
+        <PassportActions.Provider value={actions}>
+          <ReactFlow nodes={nodes} edges={edges} nodeTypes={nodeTypes} edgeTypes={edgeTypes} onNodesChange={onNodesChange} colorMode={theme}
+            onNodeClick={(_, n) => setOpen((o) => (o === n.id ? null : n.id))} onPaneClick={() => setOpen(null)}
+            fitView fitViewOptions={{ padding: 0.1 }} nodesConnectable={false} proOptions={{ hideAttribution: true }} minZoom={0.2}>
+            <Background />
+            <Controls showInteractive={false} />
+            <EdgeLabels items={items} pointFor={labelPointFor} fallback={{ w: 160, h: 60 }} />
+            <FitOpen open={open} closePadding={0.1} />
+          </ReactFlow>
+        </PassportActions.Provider>
       </div>
       </div>
       <p className="caption" role="status" aria-live="polite" data-testid="caption">{caption}</p>
