@@ -19,7 +19,7 @@ services:
       - "local.ping-devops.com:host-gateway"
     environment:
       NODE_EXTRA_CA_CERTS: ${TW_CA_FILE:-}
-      SHELF_URL: ${SHELF_URL:-http://127.0.0.1:4400}
+      SHELF_URL: ${SHELF_URL:-https://local.ping-devops.com:8443/demo-shelf}
       TW_PORT: "5910"
       TW_BIND: 0.0.0.0
       # The lab-proxy sends this name in Host (https://local.ping-devops.com:8443/token-workbench/). Loopback always works.
