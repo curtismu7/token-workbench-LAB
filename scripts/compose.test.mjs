@@ -93,5 +93,5 @@ test('the image runs on the documented port only (EXPOSE 5910, TW_PORT 5910)', (
 });
 
 test('docker-compose.yml passes a usable SHELF_URL into the container (the shelf button needs it)', () => {
-  assert.match(compose, /^\s*SHELF_URL: \$\{SHELF_URL:-http:\/\/127\.0\.0\.1:4400\}\s*$/m);
+  assert.match(compose, /^\s*SHELF_URL: \$\{SHELF_URL:-https:\/\/local\.ping-devops\.com:8443\/demo-shelf\}\s*$/m);
 });
