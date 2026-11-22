@@ -124,6 +124,15 @@ npx newman run postman/token-workbench-lab.postman_collection.json -e postman/to
 
 The committed example environment carries placeholders only. The mint request needs the lab in Real mode with the PingOne worker settings; without them it answers 502/409 and the chained requests then fail with it.
 
+## MCP server
+
+`mcp/server.mjs` is a stdio MCP server proxying a running lab as nine tools: `tw_health`, `tw_info`, `tw_decode` (per-claim meaning with RFC citations), `tw_mint` (the real client_credentials sample), `tw_introspect`, `tw_tester_cases`, `tw_tester_run`, `tw_checker_run` (BCP/FAPI packs) and `tw_flows` (the simulated mechanism comparison). It holds no state of its own; point it at the lab with `TW_LAB_BASE` (default `http://localhost:5910`):
+
+```
+npm install --prefix mcp
+TW_LAB_BASE=http://localhost:5910 node mcp/server.mjs
+```
+
 ## Configuration
 
 | Variable | Default | Meaning |
