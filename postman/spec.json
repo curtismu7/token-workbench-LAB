@@ -1,0 +1,82 @@
+{
+  "name": "Token Workbench LAB",
+  "slug": "token-workbench-lab",
+  "description": "API collection for Token Workbench LAB: health and metadata, mint a real client_credentials token from the configured issuer, decode and introspect tokens, run the tester case suite and the checker packs, and browse the simulated flow mechanisms.",
+  "baseUrl": "http://localhost:5910",
+  "env": {
+    "PINGONE_ENVIRONMENT_ID": "PingOne environment id backing the real issuer",
+    "PINGONE_CLIENT_ID": "Worker/M2M client id used for the client_credentials sample",
+    "PINGONE_CLIENT_SECRET": "Secret for that client",
+    "PINGONE_REGION": "PingOne region code (e.g. com)"
+  },
+  "envAliases": {
+    "PINGONE_ENVIRONMENT_ID": "PINGONE_ADMIN_ENV_ID"
+  },
+  "folders": [
+    {
+      "name": "Sanity",
+      "description": "Lab liveness, build info and signing keys.",
+      "requests": [
+        { "name": "Health", "method": "GET", "path": "/api/health",
+          "tests": ["pm.response.to.have.status(200);", "pm.expect(pm.response.json().state).to.eql('ready');"] },
+        { "name": "Info", "method": "GET", "path": "/api/info",
+          "tests": ["pm.response.to.have.status(200);", "const b = pm.response.json(); pm.expect(b).to.have.property('mode');"] },
+        { "name": "JWKS", "method": "GET", "path": "/api/jwks",
+          "tests": ["pm.response.to.have.status(200);", "pm.expect(pm.response.json().keys).to.be.an('array');"] }
+      ]
+    },
+    {
+      "name": "Mint and decode",
+      "description": "Mint the client_credentials sample from the configured real issuer, then decode and introspect it.",
+      "requests": [
+        { "name": "Mint client_credentials sample", "method": "POST", "path": "/api/mint",
+          "headers": { "Origin": "http://localhost:5910" },
+          "body": { "sample": "client_credentials" },
+          "tests": ["pm.response.to.have.status(200);", "const b = pm.response.json(); pm.expect(b.token).to.be.a('string').and.not.eql('');", "pm.collectionVariables.set('MINTED_TOKEN', b.token);"] },
+        { "name": "Decode the minted token", "method": "POST", "path": "/api/decode",
+          "headers": { "Origin": "http://localhost:5910" },
+          "body": { "token": "{{MINTED_TOKEN}}" },
+          "tests": ["pm.response.to.have.status(200);", "pm.expect(pm.response.json()).to.have.property('header');"] },
+        { "name": "Decode a non-JWT (negative)", "method": "POST", "path": "/api/decode",
+          "headers": { "Origin": "http://localhost:5910" },
+          "body": { "token": "opaque-token-not-a-jwt" },
+          "tests": ["pm.expect(pm.response.code).to.eql(400);", "pm.expect(pm.response.json().error).to.eql('not_a_jwt');"] },
+        { "name": "Introspect the minted token at the real issuer", "method": "POST", "path": "/api/introspect",
+          "headers": { "Origin": "http://localhost:5910" },
+          "body": { "token": "{{MINTED_TOKEN}}" },
+          "tests": ["pm.response.to.have.status(200);"] }
+      ]
+    },
+    {
+      "name": "Tester and checker",
+      "description": "Run the tester's full case suite against the lab's stubs, and the checker's BCP pack against the configured issuer.",
+      "requests": [
+        { "name": "Tester cases", "method": "GET", "path": "/api/tester/cases",
+          "tests": ["pm.response.to.have.status(200);", "pm.expect(pm.response.json().cases.length).to.be.above(0);"] },
+        { "name": "Run all tester cases", "method": "POST", "path": "/api/tester/run",
+          "headers": { "Origin": "http://localhost:5910" },
+          "body": { "case": "all" },
+          "tests": ["pm.response.to.have.status(200);", "pm.expect(pm.response.json().results).to.be.an('array');"] },
+        { "name": "Checker BCP pack", "method": "POST", "path": "/api/checker/run",
+          "headers": { "Origin": "http://localhost:5910" },
+          "body": { "pack": "bcp" },
+          "tests": ["pm.response.to.have.status(200);", "pm.expect(pm.response.json()).to.have.property('metadata');"] },
+        { "name": "Checker with an invalid pack (negative)", "method": "POST", "path": "/api/checker/run",
+          "headers": { "Origin": "http://localhost:5910" },
+          "body": { "pack": "nonsense" },
+          "tests": ["pm.expect(pm.response.code).to.eql(400);"] }
+      ]
+    },
+    {
+      "name": "Flow mechanisms (simulated)",
+      "description": "The lab's simulated OAuth/OIDC mechanism catalog and comparisons. Simulated by design: no live form exists for these.",
+      "mockOnly": true,
+      "requests": [
+        { "name": "Mechanism list", "method": "GET", "path": "/api/flows",
+          "tests": ["pm.response.to.have.status(200);", "pm.expect(pm.response.json().simulated).to.eql(true);"] },
+        { "name": "Mechanism comparison", "method": "GET", "path": "/api/flows/compare",
+          "tests": ["pm.response.to.have.status(200);", "pm.expect(pm.response.json().rows.length).to.be.above(0);"] }
+      ]
+    }
+  ]
+}
