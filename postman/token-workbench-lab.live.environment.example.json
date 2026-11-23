@@ -3,25 +3,25 @@
   "values": [
     {
       "key": "PINGONE_ENVIRONMENT_ID",
-      "value": "PingOne environment id backing the real issuer",
+      "value": "",
       "enabled": true,
       "type": "secret"
     },
     {
       "key": "PINGONE_CLIENT_ID",
-      "value": "Worker/M2M client id used for the client_credentials sample",
+      "value": "",
       "enabled": true,
       "type": "secret"
     },
     {
       "key": "PINGONE_CLIENT_SECRET",
-      "value": "Secret for that client",
+      "value": "",
       "enabled": true,
       "type": "secret"
     },
     {
       "key": "PINGONE_REGION",
-      "value": "PingOne region code (e.g. com)",
+      "value": "",
       "enabled": true,
       "type": "secret"
     }
