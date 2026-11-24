@@ -83,6 +83,7 @@ export default function App() {
         </nav>
         <span className="shell-right">
           <TopMenu
+          postman={{ repo: "curtismu7/token-workbench-LAB", slug: "token-workbench-lab" }}
           mode={{ value: real ? "real" : "mock", onChange: onSelectMode, realAvailable: info ? info.realAvailable === true : null, realHint: info && !info.realAvailable ? "Real is not configured. Set TW_REAL, TW_REAL_CLIENT_SECRET in the .env file beside docker-compose.yml, then restart the lab." : undefined }}
           theme={{ value: theme, onChange: setTheme }}
           help={{ href: "https://github.com/curtismu7/token-workbench-LAB#readme" }}

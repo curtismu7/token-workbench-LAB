@@ -18,9 +18,10 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "/* Assertions for this request */",
-                  "pm.response.to.have.status(200);",
-                  "pm.expect(pm.response.json().state).to.eql('ready');"
+                  "pm.test(\"Health\", function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  pm.expect(pm.response.json().state).to.eql('ready');",
+                  "});"
                 ]
               }
             }
@@ -50,9 +51,10 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "/* Assertions for this request */",
-                  "pm.response.to.have.status(200);",
-                  "const b = pm.response.json(); pm.expect(b).to.have.property('mode');"
+                  "pm.test(\"Info\", function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const b = pm.response.json(); pm.expect(b).to.have.property('mode');",
+                  "});"
                 ]
               }
             }
@@ -82,9 +84,10 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "/* Assertions for this request */",
-                  "pm.response.to.have.status(200);",
-                  "pm.expect(pm.response.json().keys).to.be.an('array');"
+                  "pm.test(\"JWKS\", function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  pm.expect(pm.response.json().keys).to.be.an('array');",
+                  "});"
                 ]
               }
             }
@@ -120,10 +123,11 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "/* Assertions for this request */",
-                  "pm.expect(pm.response.code).to.be.oneOf([200, 400, 403, 409, 502]);",
-                  "const b = pm.response.json();",
-                  "if (pm.response.code === 200) { pm.expect(b.token).to.be.a('string').and.not.eql(''); pm.collectionVariables.set('MINTED_TOKEN', b.token); }"
+                  "pm.test(\"Mint client_credentials sample\", function () {",
+                  "  pm.expect(pm.response.code).to.be.oneOf([200, 400, 403, 409, 502]);",
+                  "  const b = pm.response.json();",
+                  "  if (pm.response.code === 200) { pm.expect(b.token).to.be.a('string').and.not.eql(''); pm.collectionVariables.set('MINTED_TOKEN', b.token); }",
+                  "});"
                 ]
               }
             }
@@ -167,8 +171,9 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "/* Assertions for this request */",
-                  "pm.expect(pm.response.code).to.be.oneOf([200, 400, 403]);"
+                  "pm.test(\"Decode the minted token\", function () {",
+                  "  pm.expect(pm.response.code).to.be.oneOf([200, 400, 403]);",
+                  "});"
                 ]
               }
             }
@@ -212,8 +217,9 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "/* Assertions for this request */",
-                  "pm.expect(pm.response.code).to.be.oneOf([400, 403]);"
+                  "pm.test(\"Decode a non-JWT (negative)\", function () {",
+                  "  pm.expect(pm.response.code).to.be.oneOf([400, 403]);",
+                  "});"
                 ]
               }
             }
@@ -257,8 +263,9 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "/* Assertions for this request */",
-                  "pm.expect(pm.response.code).to.be.oneOf([200, 400, 403, 409, 502]);"
+                  "pm.test(\"Introspect the minted token at the real issuer\", function () {",
+                  "  pm.expect(pm.response.code).to.be.oneOf([200, 400, 403, 409, 502]);",
+                  "});"
                 ]
               }
             }
@@ -308,9 +315,10 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "/* Assertions for this request */",
-                  "pm.response.to.have.status(200);",
-                  "pm.expect(pm.response.json().cases.length).to.be.above(0);"
+                  "pm.test(\"Tester cases\", function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  pm.expect(pm.response.json().cases.length).to.be.above(0);",
+                  "});"
                 ]
               }
             }
@@ -341,8 +349,9 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "/* Assertions for this request */",
-                  "pm.expect(pm.response.code).to.be.oneOf([200, 400, 403]);"
+                  "pm.test(\"Run all tester cases\", function () {",
+                  "  pm.expect(pm.response.code).to.be.oneOf([200, 400, 403]);",
+                  "});"
                 ]
               }
             }
@@ -387,8 +396,9 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "/* Assertions for this request */",
-                  "pm.expect(pm.response.code).to.be.oneOf([200, 400, 403]);"
+                  "pm.test(\"Checker BCP pack\", function () {",
+                  "  pm.expect(pm.response.code).to.be.oneOf([200, 400, 403]);",
+                  "});"
                 ]
               }
             }
@@ -433,8 +443,9 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "/* Assertions for this request */",
-                  "pm.expect(pm.response.code).to.be.oneOf([400, 403]);"
+                  "pm.test(\"Checker with an invalid pack (negative)\", function () {",
+                  "  pm.expect(pm.response.code).to.be.oneOf([400, 403]);",
+                  "});"
                 ]
               }
             }
@@ -485,9 +496,10 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "/* Assertions for this request */",
-                  "pm.response.to.have.status(200);",
-                  "pm.expect(pm.response.json().simulated).to.eql(true);"
+                  "pm.test(\"Mechanism list\", function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  pm.expect(pm.response.json().simulated).to.eql(true);",
+                  "});"
                 ]
               }
             }
@@ -517,9 +529,10 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "/* Assertions for this request */",
-                  "pm.response.to.have.status(200);",
-                  "pm.expect(pm.response.json().rows.length).to.be.above(0);"
+                  "pm.test(\"Mechanism comparison\", function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  pm.expect(pm.response.json().rows.length).to.be.above(0);",
+                  "});"
                 ]
               }
             }
