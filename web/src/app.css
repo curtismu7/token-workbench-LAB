@@ -18,7 +18,7 @@ code, .mono { font-size: 0.85rem; overflow-wrap: anywhere; }
   background: var(--box-dark); color: var(--on-box); border-bottom: 3px solid transparent; border-image: var(--accent-gradient) 1; }
 .shell-bar :focus-visible { outline: 3px solid var(--on-box); outline-offset: 2px; }
 .shell-bar h1 { color: var(--on-box); font-size: 1.2rem; }
-.shell-brand { display: inline-flex; align-items: center; gap: 0.6rem; font-weight: 700; letter-spacing: 0.02em; }
+.shell-brand  { display: inline-flex; align-items: center; gap: 0.6rem; font-weight: 700; letter-spacing: 0.02em; }
 .shell-logo { display: inline-grid; place-items: center; width: 1.9rem; height: 1.9rem; border-radius: 4px; background: var(--accent-gradient); color: var(--wb-on-accent); font-weight: 800; font-size: 0.8rem; }
 .shell-right { display: inline-flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; font-size: 0.85rem; }
 .tabbar { display: flex; flex-wrap: wrap; overflow-x: auto; padding: 0.25rem 0; gap: 0.25rem; flex: 1 1 12rem; }
