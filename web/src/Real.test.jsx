@@ -1,4 +1,4 @@
-// Rule 19, Real mode in the page: the honest "Real not configured" state, the REAL banner and badge, REAL-labelled tokens,
+// Rule 19, Real mode in the page: the honest "Real not configured" state, the REAL badge (the REAL modal is in Modal.test.jsx), REAL-labelled tokens,
 // the trace (live token flow log) with the secret only as a marker, the metadata-only checker and the stubs-only notes.
 import React from "react";
 import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
@@ -35,7 +35,7 @@ describe("Real not configured", () => {
     expect(screen.getByTestId("mode-real").title).toBe("Real is not configured. Set TW_REAL, TW_REAL_CLIENT_SECRET in the .env file beside docker-compose.yml, then restart the lab.");
   });
 
-  it("the page shows the MOCK banner first and a 'Real not configured' card with every setting and what is missing", async () => {
+  it("the page shows a 'Real not configured' card with every setting and what is missing", async () => {
     stubFetch(base(INFO_OFF));
     render(<App />);
     const card = await screen.findByTestId("real-status");
@@ -45,15 +45,14 @@ describe("Real not configured", () => {
     expect(row("TW_REAL_CLIENT_SECRET")).toHaveTextContent("missing or invalid");
     expect(row("TW_REAL_ISSUER")).toHaveTextContent("ok");
     expect(within(card).getByTestId("real-problems")).toHaveTextContent("TW_REAL_CLIENT_SECRET is not set");
-    const banner = screen.getByTestId("mode-banner");
-    expect(banner).toHaveTextContent(/^MOCK:/); expect(banner).not.toHaveAttribute("data-state");
-    expect(document.body.querySelector(".banner")).toBe(banner);
+    expect(screen.queryByTestId("mode-banner")).toBeNull();
+    expect(document.body.querySelector(".banner")).toBeNull();
     expect(screen.getByTestId("mode-badge")).toHaveTextContent("DEMO");
   });
 
   it("no Real card when Real is available or in the hosted build", async () => {
     stubFetch(base(INFO_REAL)); const { unmount } = render(<App />);
-    await screen.findByText(/REAL: Decode/); expect(screen.queryByTestId("real-status")).toBeNull(); unmount();
+    await waitFor(() => expect(screen.getByTestId("mode-select")).toHaveValue("real")); expect(screen.queryByTestId("real-status")).toBeNull(); unmount();
     stubFetch(base({ mode: "se-mock", hosted: true, source: "mock", realAvailable: false, real: null }));
     render(<App />); await waitFor(() => expect(screen.getByTestId("mode-select")).toHaveValue("mock"));
     expect(screen.queryByTestId("real-status")).toBeNull();
@@ -61,13 +60,11 @@ describe("Real not configured", () => {
 });
 
 describe("Real mode", () => {
-  it("live banner and REAL badge; minting gets a REAL token and shows the trace with the secret only as a marker", async () => {
+  it("REAL badge; minting gets a REAL token and shows the trace with the secret only as a marker", async () => {
     const calls = stubFetch({ ...base(INFO_REAL), "POST /api/mint": { source: "real", label: "REAL", sample: "client_credentials", token: fakeToken({ iss: "https://idp.example/as" }), trace: TRACE }, "POST /api/decode": decoded({ source: "real" }) });
     render(<App />);
-    const banner = await screen.findByTestId("mode-banner");
-    await waitFor(() => expect(banner).toHaveAttribute("data-state", "live"));
-    expect(banner).toHaveTextContent("https://idp.example");
-    expect(screen.getByTestId("mode-badge")).toHaveTextContent("REAL");
+    await waitFor(() => expect(screen.getByTestId("mode-badge")).toHaveTextContent("REAL"));
+    expect(screen.queryByTestId("mode-banner")).toBeNull();
     expect(screen.queryByRole("button", { name: "DPoP-bound" })).toBeNull();
     await userEvent.click(screen.getByRole("button", { name: "REAL client_credentials token" }));
     expect(await screen.findByTestId("token-label")).toHaveTextContent("REAL");
@@ -90,7 +87,7 @@ describe("Real mode", () => {
   it("introspection shows ACTIVE with the REAL label", async () => {
     stubFetch({ ...base(INFO_REAL), "POST /api/introspect": { source: "real", active: true, trace: TRACE.slice(0, 1) } });
     render(<App />);
-    await screen.findByText(/REAL: Decode/);
+    await waitFor(() => expect(screen.getByTestId("mode-badge")).toHaveTextContent("REAL"));
     await userEvent.type(screen.getByLabelText("Token (JWT)"), "a.b.c");
     await userEvent.click(screen.getByRole("button", { name: "Introspect at the issuer" }));
     const r = await screen.findByTestId("introspect-result");
@@ -112,7 +109,7 @@ describe("Real mode", () => {
   it("the tester and the flow catalog say they have no Real version", async () => {
     stubFetch(base(INFO_REAL));
     render(<App />);
-    await screen.findByText(/REAL: Decode/);
+    await waitFor(() => expect(screen.getByTestId("mode-badge")).toHaveTextContent("REAL"));
     await userEvent.click(screen.getByRole("button", { name: "Wrong-token tester" }));
     expect(screen.getAllByTestId("real-note").some((n) => n.checkVisibility?.() ?? true)).toBe(true);
     await userEvent.click(screen.getByRole("button", { name: "Flow catalog" }));
@@ -126,7 +123,7 @@ describe("Real mode", () => {
     await waitFor(() => expect(screen.getByTestId("mode-select")).toHaveValue("real"));
     await screen.findByTestId("trace");
     await userEvent.selectOptions(screen.getByTestId("mode-select"), "mock");
-    await waitFor(() => expect(screen.getByTestId("mode-banner")).toHaveTextContent(/^MOCK:/));
+    await waitFor(() => expect(screen.getByTestId("mode-badge")).toHaveTextContent("DEMO"));
     expect(screen.queryByTestId("trace")).toBeNull();
     expect(screen.queryByTestId("token-label")).toBeNull();
     expect(screen.getByLabelText("Token (JWT)")).toHaveValue("");

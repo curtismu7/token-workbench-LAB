@@ -15,37 +15,20 @@ const routes = (meta) => ({
 });
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 
-describe("hosted and simulated banner (MODE=se-mock)", () => {
-  it("shows the server's banner above every tab, and keeps it when switching tabs", async () => {
+describe("hosted build (MODE=se-mock)", () => {
+  it("shows no banner element in the hosted or the local build (the Real-or-mock modal says it; see Modal.test.jsx), and no modal when the page is pre-dismissed", async () => {
     stubFetch(routes({ ...META, hosted: true, deployMode: "se-mock", banner: BANNER }));
-    render(<App />);
-    expect(await screen.findByTestId("hosted-banner")).toHaveTextContent(BANNER);
-    for (const [, label] of TABS) {
-      // The TopMenu talk-track toggle shares the "Talk track" name; tabs are the buttons in the nav.
-      const tabsNav = screen.getByRole("navigation", { name: "Tools" });
-      await userEvent.click([...tabsNav.querySelectorAll("button")].find((b) => b.textContent === label));
-      expect(screen.getByTestId("hosted-banner")).toHaveTextContent(/^HOSTED SIMULATION/);
-    }
-  });
-
-  it("shows no hosted banner in the local build, or when the meta call fails", async () => {
-    stubFetch(routes({ ...META, hosted: false, deployMode: "local", banner: null }));
     render(<App />);
     await screen.findByTestId("mode-badge");
     await new Promise((r) => { setTimeout(r, 20); });
     expect(screen.queryByTestId("hosted-banner")).toBeNull();
-    cleanup();
-    stubFetch({ "GET /api/health": HEALTH });
-    render(<App />);
-    await new Promise((r) => { setTimeout(r, 20); });
-    expect(screen.queryByTestId("hosted-banner")).toBeNull();
-  });
-
-  it("renders the banner text as text, never as HTML", async () => {
-    stubFetch(routes({ ...META, hosted: true, banner: "<img src=x onerror=alert(1)> hosted" }));
-    const { container } = render(<App />);
-    expect(await screen.findByTestId("hosted-banner")).toHaveTextContent("<img src=x onerror=alert(1)> hosted");
-    expect(container.querySelector("img")).toBeNull();
+    expect(document.querySelector(".banner.hosted")).toBeNull();
+    for (const [, label] of TABS) {
+      // The TopMenu talk-track toggle shares the "Talk track" name; tabs are the buttons in the nav.
+      const tabsNav = screen.getByRole("navigation", { name: "Tools" });
+      await userEvent.click([...tabsNav.querySelectorAll("button")].find((b) => b.textContent === label));
+      expect(screen.queryByTestId("hosted-banner")).toBeNull();
+    }
   });
 });
 

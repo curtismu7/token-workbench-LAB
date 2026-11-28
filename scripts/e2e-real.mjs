@@ -2,7 +2,7 @@
 // Real-browser run of REAL mode, without any real tenant: the lab runs in this process with TW_REAL settings pointing at
 // https://idp.example/as, and its netguard is handed a fetch that maps exactly that origin to a stub issuer on loopback
 // (discovery, JWKS, client_credentials, introspection). Anything else is refused and counted. Drives headless Chromium in
-// light at 1280px and dark at 375px: REAL banner and badge, REAL token label, trace with the secret only as a marker,
+// light at 1280px and dark at 375px: REAL modal and badge, REAL token label, trace with the secret only as a marker,
 // JWKS verify, introspection, metadata-only checker, stubs-only notes, toggle both ways, no secret in the DOM.
 //
 //   npm run build && npm run e2e:real      (ports 5920-5926; E2E_SHOTS=<dir> for screenshots)
@@ -66,8 +66,10 @@ try {
     page.on('request', (r) => { if (!r.url().startsWith(app.url.replace(/\/$/, '')) && !/^(data|blob):/.test(r.url())) offOrigin.push(r.url()); });
     const tag = `[${scheme} ${width}px]`;
     await page.goto(app.url);
-    await page.getByTestId('mode-banner').filter({ hasText: 'REAL:' }).waitFor();
-    check(await page.evaluate(() => document.querySelector('.banner')?.dataset.state === 'live'), `${tag} the REAL banner is first and marked live`);
+    await page.locator('[data-testid=mode-modal][data-mode=real]').waitFor();
+    check((await page.getByTestId('mode-modal').innerText()).startsWith('REAL') && (await page.getByTestId('mode-modal').innerText()).includes(new URL(ISSUER).origin), `${tag} the REAL modal opens and names the issuer`);
+    await page.getByTestId('mode-modal-ok').click();
+    check((await page.getByTestId('mode-banner').count()) === 0, `${tag} no simulation banner`);
     check((await page.getByTestId('mode-badge').innerText()).startsWith('REAL'), `${tag} the header badge says REAL`);
     check((await page.getByTestId('mode-select').inputValue()) === 'real', `${tag} the mode control shows Real`);
     await page.getByRole('button', { name: 'REAL client_credentials token' }).click();
@@ -94,12 +96,14 @@ try {
     const html = await page.content();
     check(secretForms.every((f) => !html.includes(f)), `${tag} the client secret is nowhere in the page`);
     await page.getByTestId('mode-select').selectOption('mock');
-    await page.getByTestId('mode-banner').filter({ hasText: 'MOCK:' }).waitFor();
+    await page.locator('[data-testid=mode-modal][data-mode=mock]').waitFor();
+    await page.getByTestId('mode-modal-ok').click();
     await page.getByRole('button', { name: 'Decode / Trace', exact: true }).click();
     check((await page.getByTestId('trace').count()) === 0 && (await page.getByRole('button', { name: 'DPoP-bound' }).count()) === 1, `${tag} switching to Mock clears the REAL trace and brings back the stub samples`);
     await page.getByTestId('mode-select').selectOption('real');
-    await page.getByTestId('mode-banner').filter({ hasText: 'REAL:' }).waitFor();
-    check(true, `${tag} switching back to Real works without a restart`);
+    await page.locator('[data-testid=mode-select]').waitFor();
+    await page.waitForFunction(() => document.querySelector('[data-testid=mode-badge]')?.textContent.startsWith('REAL'));
+    check((await page.getByTestId('mode-modal').count()) === 0, `${tag} switching back to Real works without a restart (REAL already dismissed: no modal)`);
     check(offOrigin.length === 0, `${tag} the browser made no off-origin request ${JSON.stringify(offOrigin)}`);
     check(errors.length === 0, `${tag} no page or console errors ${JSON.stringify(errors)}`);
     await page.close();

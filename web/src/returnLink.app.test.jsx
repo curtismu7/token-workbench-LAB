@@ -1,4 +1,4 @@
-// Opened from Customer Agent LAB: the strip sits right below the banners (the hosted simulation banner stays first), a compact Back
+// Opened from Customer Agent LAB: the strip opens the page (the simulation banner is gone: the Real-or-mock modal says it), a compact Back
 // button sits in the header, and UC-LEARN6 opens the Flow catalog tab (handoffMap.js).
 import React from "react";
 import fs from "node:fs";
@@ -28,14 +28,16 @@ describe("hand-off from Customer Agent LAB", () => {
     expect(tabFor(null)).toBeNull();
   });
 
-  it("UC-LEARN6: hosted banner then strip, header Back, the Flow catalog tab is open", async () => {
+  it("UC-LEARN6: the strip first, no banner, header Back, the Flow catalog tab is open", async () => {
     stubFetch({ ...base, "GET /api/meta": { ...META, hosted: true, banner: "Hosted and simulated." } });
     at("/?from=customer-agent&uc=UC-LEARN6&vertical=banking");
     render(<App />);
     const strip = screen.getByRole("note", { name: "Opened from Customer Agent LAB" });
     expect(strip).toHaveTextContent("UC-LEARN6");
-    const banner = await screen.findByTestId("hosted-banner");
-    expect(banner.nextElementSibling).toBe(strip);
+    await screen.findByTestId("mode-badge");
+    expect(screen.queryByTestId("hosted-banner")).toBeNull();
+    expect(screen.queryByTestId("mode-banner")).toBeNull();
+    expect(strip.previousElementSibling).toBe(document.querySelector("a.skip"));
     expect(document.querySelector("header.shell-bar .top-menu button.return-link--header")).not.toBeNull();
     expect(pressed()).toEqual(["Flow catalog"]);
     expect(await screen.findByRole("heading", { name: "Token-flow catalog" })).toBeInTheDocument();

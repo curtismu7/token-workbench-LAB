@@ -1,6 +1,6 @@
 # Talk track (4-6 minutes)
 
-In Mock (the default) everything on screen is a stub running on this machine. Say so first, and point at the MOCK banner. If the owner turned Real on, the banner says REAL and names the one issuer it calls.
+In Mock (the default) everything on screen is a stub running on this machine. Say so first: the page opens on a MOCK modal. If the owner turned Real on, the modal says REAL and names the one issuer it calls.
 
 ## Pitch (one sentence)
 
@@ -26,7 +26,7 @@ Open https://local.ping-devops.com:8443/token-workbench/ (the lab-proxy; the lab
 
 Only if the owner set the `TW_REAL*` settings (README "Real mode"); otherwise the Real button is disabled and the "Real not configured" card lists what is needed. This is the hand-off for Customer Agent LAB's UC-LEARN17 (OAuth debug, live token flow log).
 
-10. **Header toggle: Real.** Say: "Now the same tab talks to one real issuer, and nothing else. The banner names it."
+10. **Header toggle: Real.** Say: "Now the same tab talks to one real issuer, and nothing else. The REAL modal names it."
 11. **Decode / Trace: REAL client_credentials token.** Say: "That is a real access token, labelled REAL, shown raw because this is a debugging tool. Underneath is the trace: the discovery request and the token request exactly as sent and answered. The client secret never appears; it shows as write-only."
 12. **Tick Verify, Decode; then Introspect at the issuer.** Say: "Verified against the issuer's real JWKS, then the issuer itself says whether the token is active. The trace shows the requests of the step you just ran."
 13. **Profile checker in Real.** Say: "One GET of the issuer's published metadata. A pass here means advertised, not enforced; rules that need crafted attack requests say NOT CHECKED, because we never send those to a real server."
