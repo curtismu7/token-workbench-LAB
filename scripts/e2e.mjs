@@ -56,12 +56,18 @@ try {
   const noHScroll = () => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1);
 
   const resp = await page.goto(`${base}/`);
+  // The Real-or-mock modal opens first: MOCK, no banner. Close it (it blocks every click) and check it stays closed after a same-session reload.
+  await page.getByTestId('mode-modal').waitFor();
+  check((await page.getByTestId('mode-modal').getAttribute('data-mode')) === 'mock' && (await page.getByTestId('mode-modal').innerText()).startsWith('MOCK'), 'the page opens on the MOCK modal');
+  await page.getByTestId('mode-modal-ok').click();
+  check((await page.getByTestId('mode-modal').count()) === 0, 'Got it closes the modal');
+  await page.reload(); await page.getByTestId('mode-badge').waitFor(); await page.waitForTimeout(500);
+  check((await page.getByTestId('mode-modal').count()) === 0 && (await page.locator('.banner[data-testid=mode-banner]').count()) === 0, 'no modal after a same-session reload, and no simulation banner');
   const csp = resp.headers()['content-security-policy'] || '';
   check(/default-src 'self'/.test(csp) && !/unsafe-eval/.test(csp), 'the UI is served with a same-origin CSP');
   await page.getByTestId('mode-badge').waitFor();
   check((await page.getByTestId('mode-badge').innerText()).includes('DEMO'), 'header shows the DEMO badge');
-  // Rule 19 without Real settings: MOCK banner first, Real disabled naming the settings, the "Real not configured" card.
-  check(await page.evaluate(() => document.querySelector('.banner')?.dataset.testid === 'mode-banner' && document.querySelector('.banner').textContent.startsWith('MOCK:')), 'the MOCK banner is the first banner');
+  // Rule 19 without Real settings: Real disabled naming the settings, the "Real not configured" card.
   await page.getByTestId('mode-select').waitFor();
   check(await page.getByTestId('mode-select').getAttribute('aria-label') === 'Mock or Real', 'the top-menu mode control is the Mock/Real select');
   const realOption = page.getByTestId('mode-select').locator('option[value="real"]');

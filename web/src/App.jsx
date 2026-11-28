@@ -15,6 +15,7 @@ import { workspaceId } from "./lib/api.js";
 import ReturnLink from "./return-link/ReturnLink.jsx";
 import { readReturnContext } from "./return-link/returnTargets.js";
 import { tabFor } from "./handoffMap.js";
+import ModeModal from "./mode-modal/ModeModal.jsx";
 
 const safe = (fn, fallback) => { try { return fn(); } catch { return fallback; } };
 const initialTheme = () => {
@@ -23,6 +24,13 @@ const initialTheme = () => {
 };
 
 export const TABS = [["decode", "Decode / Trace"], ["tester", "Wrong-token tester"], ["checker", "Profile checker"], ["flows", "Flow catalog"], ["talk", "Talk track"]];
+
+// The Real-or-mock modal's lines (it replaced the long MOCK / REAL / hosted banners). Hosted keeps its own client-side line; the server's `banner` field in /api/meta is left alone.
+export const MODE_LINES = {
+  mock: "Every authorization server, resource server and token here is a stub in this process on loopback. Nothing real is contacted.",
+  hosted: "HOSTED SIMULATION: this is a shared hosted demo. Every stub server, key and token here is simulated and lives in memory in the server, private to your browser tab. Nothing real is contacted and you cannot point it at anything.",
+};
+export const realLine = (origin) => `Decode / Trace and the Profile checker call the configured issuer ${origin || "(not named)"} and nothing else, and the tokens shown are real, raw on purpose: treat this screen as sensitive. The tester and the flow catalog still use the in-process stubs.`;
 
 // Real mode on a tab that has no Real version: say so, every time.
 const StubsOnly = () => <p className="callout-text" data-testid="real-note">No Real version of this tab: it always runs against the in-process stubs, so its results are MOCK even while the header says Real.</p>;
@@ -33,7 +41,9 @@ export default function App() {
   const [tab, setTab] = useState(() => tabFor(readReturnContext(window.location.search)) || "decode");
   const [health, setHealth] = useState(null);
   const [message, setMessage] = useState("");
-  const [hostedBanner, setHostedBanner] = useState(null);
+  const [hosted, setHosted] = useState(false);
+  const [metaDone, setMetaDone] = useState(false);
+  const [infoDone, setInfoDone] = useState(false);
   const [info, setInfo] = useState(null);
   const [notesOpen, setNotesOpen] = useState(false);
 
@@ -42,10 +52,10 @@ export default function App() {
     else document.documentElement.setAttribute("data-theme", theme);
     safe(() => localStorage.setItem("tw-theme", theme));
   }, [theme]);
-  // The hosted build (MODE=se-mock) serves its banner text in /api/meta; the local build serves none.
-  useEffect(() => { getMeta().then((m) => setHostedBanner(m?.hosted && typeof m.banner === "string" ? m.banner : null), () => {}); }, []);
+  // The hosted build (MODE=se-mock) says so in /api/meta; the local build does not. The modal waits for it (and for /api/info) so a hosted or Real page never flashes the wrong line.
+  useEffect(() => { getMeta().then((m) => setHosted(m?.hosted === true), () => {}).finally(() => setMetaDone(true)); }, []);
   useEffect(() => { getHealth().then(setHealth, () => setHealth({ unreachable: true })); }, []);
-  useEffect(() => { getInfo().then(setInfo, () => {}); }, []);
+  useEffect(() => { getInfo().then(setInfo, () => {}).finally(() => setInfoDone(true)); }, []);
   // Rule 19: the Mock/Real toggle. A switch is announced and the server's answer is what the toggle shows; every tab is
   // keyed on the mode, so it reloads its data after a switch.
   const onSelectMode = async (source) => {
@@ -61,12 +71,8 @@ export default function App() {
   return (
     <>
       <a className="skip" href="#main" onClick={(e) => { e.preventDefault(); document.getElementById("main")?.focus(); }}>Skip to content</a>
-      {!hostedBanner && (real
-        ? <div className="banner" role="note" data-state="live" data-testid="mode-banner">REAL: Decode / Trace and the Profile checker call the configured issuer {info.real?.issuerOrigin} and nothing else. Tokens shown are real, raw on purpose: treat this screen as sensitive. The tester and the flow catalog still use the in-process stubs.</div>
-        : <div className="banner" role="note" data-testid="mode-banner">MOCK: every authorization server, resource server and token here is a stub in this process on loopback. Nothing real is contacted.</div>)}
       {health?.unreachable && <div className="banner warn" role="alert">Cannot reach the Token Workbench API. Is the server running?</div>}
       {health && !health.unreachable && health.state !== "ready" && <div className="banner warn" role="alert">Server health is {health.state}. Run <code>npm run doctor</code>.</div>}
-      {hostedBanner && <div className="banner hosted" role="note" data-testid="hosted-banner">{hostedBanner}</div>}
       <ReturnLink app="token-workbench" />
       <header className="shell-bar">
         <span className="shell-brand">
@@ -109,6 +115,12 @@ export default function App() {
         {notesOpen && <ReleaseNotes version={info?.version || ""} onClose={() => setNotesOpen(false)} />}
         <Story active={tab} />
       </main>
+      <ModeModal
+        mode={real && !hosted ? "real" : "mock"}
+        lines={{ mock: hosted ? MODE_LINES.hosted : MODE_LINES.mock, real: realLine(info?.real?.issuerOrigin) }}
+        suppress={!(metaDone && infoDone)}
+        storageKey={hosted ? "tw-mode-hosted" : "tw-mode"}
+      />
     </>
   );
 }

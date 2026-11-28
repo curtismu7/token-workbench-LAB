@@ -11,7 +11,6 @@ code, .mono { font-size: 0.85rem; overflow-wrap: anywhere; }
 .skip { position: absolute; left: 0.5rem; top: -4rem; z-index: 50; padding: 0.5rem 0.8rem; background: var(--accent); color: var(--on-accent); border-radius: 6px; }
 .skip:focus { top: 0.5rem; }
 
-.banner.hosted { border-left-color: var(--status-info); font-weight: 700; }
 .banner.warn { border-left-color: var(--status-warn); }
 /* Shell bar (STANDALONE-UI-PATTERNS.md section 1): Core Dark in both themes, Ping Red gradient rule, full-bleed. */
 .shell-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 1.25rem; padding: 0.6rem 1.25rem; margin: 0 -16px; position: relative;

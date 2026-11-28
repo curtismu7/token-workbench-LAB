@@ -21,3 +21,7 @@ if (typeof globalThis.localStorage?.clear !== "function") {
     value: { getItem: (k) => (store.has(k) ? store.get(k) : null), setItem: (k, v) => store.set(k, String(v)), removeItem: (k) => store.delete(k), clear: () => store.clear() },
   });
 }
+
+// The Real-or-mock modal opens on every fresh session; the page tests start with it already dismissed (src/Modal.test.jsx clears these keys).
+beforeEach(() => { try { for (const k of ["tw-mode-seen-mock", "tw-mode-seen-real", "tw-mode-hosted-seen-mock"]) sessionStorage.setItem(k, "1"); } catch { /* no sessionStorage */ } });
+afterEach(() => { try { sessionStorage.clear(); } catch { /* no sessionStorage */ } });
